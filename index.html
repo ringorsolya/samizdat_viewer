@@ -148,6 +148,7 @@ table.t th{color:var(--muted);font-weight:600;font-size:12px}
     <button data-v="szotarak">Szótárak</button>
     <button data-v="naplo">Napló</button>
     <button data-v="munkatarsak" id="navMt" class="hidden">Munkatársak</button>
+    <button data-v="sugo">Súgó</button>
   </nav>
   <div class="user"><span id="whoami"></span>
     <button class="btn sm ghost" id="themeBtn" title="Világos/sötét">◐</button>
@@ -549,7 +550,7 @@ async function go(view, id = null) {
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
   const app = $('#app'); app.innerHTML = '';
-  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo, munkatarsak: viewMunkatarsak }[S.view] || viewTetelek)(app);
+  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo, munkatarsak: viewMunkatarsak, sugo: viewSugo }[S.view] || viewTetelek)(app);
 }
 
 /* =====================================================================
@@ -1534,21 +1535,113 @@ function viewExport(app) {
         h('button', { class: 'btn pri', onclick: () => futtat('mrc') }, 'MARC 21 (.mrc)'), h('button', { class: 'btn', onclick: () => futtat('mrk') }, 'MarcEdit-szöveg (.mrk)'),
         h('button', { class: 'btn', onclick: () => futtat('csv') }, 'Lapos CSV (Excel)'))),
     elo,
-    h('div', { class: 'card' }, h('h2', {}, 'Mi kerül a MARC-rekordba?'), h('table', { class: 't', style: 'margin-top:8px' }, h('tbody', {}, ...[
-      ['Leader/07', 'cikk periodikában → b; cikk kötetben → a; önálló kiadvány → m; periodika → s. A periodikaszám (b szint) nem önálló rekord: adatai a cikkek 773 $g mezőjébe kerülnek.'],
-      ['001, 005, 008', 'sorszám; utolsó módosítás; 008/06–14 a dátummodellből számolva (s/e/q/d/u/i/n), ország (pl. gb → xxk), nyelv'],
-      ['041', 'fordításnál: $a nyelv, $h eredeti nyelv'],
-      ['100/110, 700/710', 'közreműködők relátorkóddal ($e magyarul, $4 MARC-kód), $1 Wikidata-URI, $0 VIAF/GND/ISNI. A helyi szerepkódok csak $e-ben.'],
-      ['245, 264, 300', 'cím (2. indikátor: nem rendező karakterek), impresszum ahogy a kiadványon áll, terjedelem'],
-      ['336–338, 340, 365', 'RDA tartalom/média/hordozó, sokszorosítási technika ($d), ár'],
-      ['500, 506, 520', 'rovat, megállapított közreműködők, megjegyzés; hozzáférés; tartalmi kivonat'],
-      ['534, 787', 'átvétel: típus, forrás, útvonal, indoklás; ha a forrás is fel van véve, 787 kapcsolat'],
-      ['600/610/650/651/647, 655', 'említett személyek és kulcsszavak entitástípus szerint ($2 local, $1 URI), műfaj'],
-      ['773', 'gazdadokumentum: periodika/kötet címe, szám, oldal, $w a gazdarekord 001-ese'],
-      ['852, 856', 'példány: őrző intézmény, jelzet, állapot; digitális objektum'],
-      ['900, 901', 'helyi mezők: bizonyosság, adatforrás, hivatkozás, annotátor, ellenőrzöttség; üres mezők oka (nincs adat / nem vonatkozik)']
-    ].map(([a, b]) => h('tr', {}, h('th', { style: 'white-space:nowrap' }, a), h('td', {}, b)))))));
+    h('p', { class: 'sub' }, 'Hogy melyik adat melyik MARC-mezőbe kerül, a Súgó fülön, a „MARC-export” résznél olvasható.'));
   app.append(h('div', { class: 'content', style: 'height:100%' }, page));
+}
+/* =====================================================================
+   SÚGÓ
+   ===================================================================== */
+const MARC_TABLA = [
+  ['Leader/07', 'A tétel típusa: cikk periodikában → b; cikk kötetben → a; önálló kiadvány → m; periodika → s; gyűjtemény → c. A periodikaszám nem önálló rekord, adatai a cikkek 773 $g mezőjébe kerülnek.'],
+  ['001, 005, 008', 'Sorszám; utolsó módosítás ideje; 008: felvitel dátuma, dátumtípus és évek (a dátummezőkből számolva), ország (pl. gb → xxk), nyelv.'],
+  ['041', 'Fordításnál: $a a tétel nyelve, $h az eredeti nyelv.'],
+  ['100/110, 700/710', 'Közreműködők: az első szerző 100/110, a többiek 700/710. $e a szerep magyarul, $4 a MARC-relátorkód, $1 a Wikidata-URI, $0 a VIAF/GND/ISNI-URI. A helyi szerepek (pl. futár) csak $e-ben.'],
+  ['245', 'Cím ($a), alcím ($b), felelősségi közlés ($c); 2. indikátor: a nem rendező karakterek száma.'],
+  ['264, 300', 'Impresszum úgy, ahogy a kiadványon áll (hely, kiadó, dátum); terjedelem.'],
+  ['336, 337, 338', 'RDA tartalom-, média- és hordozótípus (lásd az RDA részt).'],
+  ['340, 365', 'Sokszorosítási technika ($d); ár.'],
+  ['500, 506, 520', 'Rovat, külső forrásból megállapított közreműködők, megjegyzés; hozzáférés; tartalmi kivonat.'],
+  ['534, 787', 'Átvétel: típus, forrás, útvonal, indoklás. Ha a forrás is szerepel az adatbázisban, 787-es kapcsolat is készül.'],
+  ['600 / 610 / 650 / 651 / 647', 'Említett személyek (600), testületek (610), fogalmak (650), helyek (651), események (647); $2 local, $1 Wikidata-URI.'],
+  ['655', 'Műfaj.'],
+  ['773', 'A gazdadokumentum (periodika vagy kötet): cím, kiadási adatok, szám és oldal ($g), a gazdarekord azonosítója ($w).'],
+  ['852, 856', 'Példány: őrző intézmény, jelzet, állapot; digitális objektum URI-ja.'],
+  ['900, 901', 'Helyi mezők: bizonyosság, adatforrás, forráshivatkozás, annotátor, ellenőrzöttség; az üres mezők oka (nincs adat / nem vonatkozik).']
+];
+function viewSugo(app) {
+  const page = h('div', { class: 'page', style: 'padding:16px;max-width:900px' });
+  app.append(h('div', { class: 'content', style: 'height:100%' }, page));
+  const fej = [];
+  const resz = (id, cim, ...tart) => { fej.push([id, cim]); return h('section', { id: 'sugo-' + id, class: 'card' }, h('h2', { style: 'margin-bottom:8px' }, cim), ...tart); };
+  const p = (...x) => h('p', {}, ...x);
+  const ul = (...li) => h('ul', {}, ...li.map(x => h('li', {}, ...[].concat(x))));
+  const tabla = (fejlec, sorok) => h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...fejlec.map(x => h('th', {}, x)))), h('tbody', {}, ...sorok.map(r => h('tr', {}, ...r.map((c, i) => h(i ? 'td' : 'th', i ? {} : { style: 'white-space:nowrap' }, c)))))) ;
+  const b = x => h('b', {}, x), kbd = x => h('span', { class: 'kbd' }, x);
+  const szotarSorok = (lista, leirasKell = false) => Object.values(S.szotar[lista] || {}).filter(r => r.ervenyes).sort((a, c) => a.sorrend - c.sorrend)
+    .map(r => leirasKell ? [r.cimke, r.marc_kod || '–', r.leiras || ''] : [r.cimke, r.marc_kod || 'helyi kód']);
+
+  const reszek = [
+    resz('gyors', 'Gyors útmutató: új cikk felvitele',
+      h('ol', {},
+        h('li', {}, 'A bal oldali listában kattints a számra (pl. „1. évfolyam, 6. szám”), majd a ', b('+ Cikk ebbe'), ' gombra. Vagy: ', b('+ Új tétel'), ' → válaszd, mit veszel fel.'),
+        h('li', {}, 'Töltsd ki a címet, a műfajt, a nyelvet és az oldalt. Ha fordítás, az eredeti nyelvet is.'),
+        h('li', {}, 'Szerző, fordító, szerkesztő: kattints a megfelelő gombra, és kezdd el gépelni a nevet. Ha még nincs az adatbázisban, a lista alján az „+ Új” sorral felveheted.'),
+        h('li', {}, 'Kulcsszavak és említett személyek: gépelj, majd ', kbd('Enter'), ' vagy kattintás. Ugyanígy lehet újat felvenni.'),
+        h('li', {}, 'Írj 2–3 mondatos tartalmi kivonatot.'),
+        h('li', {}, b('Mentés és következő cikk'), ': elmenti, és rögtön új űrlapot nyit ugyanabba a számba (a nyelv, a rovat, a szerkesztő és az őrző intézmény átkerül).')),
+      p('Mentés bármikor: ', kbd('Ctrl+S'), '. A ritkábban kellő adatok (átvétel, példány, digitális változat, RDA, apparátus) a ', b('Részletek'), ' blokkban vannak, alapból becsukva.')),
+    resz('tipus', 'A tételek típusai',
+      p('A listában szereplő rövid jelölések a tétel bibliográfiai szintjét mutatják. Az adatbázisban a MARC-szabvány betűkódjai tárolódnak.'),
+      tabla(['A felületen', 'Jelentés', 'Kód', 'Szülője'], [
+        ['lap', 'Periodika egésze (pl. Demokrata)', 's', 'nincs (vagy gyűjtemény)'],
+        ['szám', 'A periodika egy száma', 'b', 'lap'],
+        ['cikk', 'Cikk, kép, karikatúra, rövidhír', 'a', 'szám vagy kötet'],
+        ['kötet', 'Önálló kiadvány: könyv, brosúra, röplap', 'm', 'nincs (vagy gyűjtemény)'],
+        ['gyűjt.', 'Gyűjtemény / sorozat', 'c', 'nincs']]),
+      p('Öröklés: a kiadót, a kiadás helyét, az országot, a dátumot, az árat és a sokszorosítási technikát elég a számnál (vagy a lapnál) megadni, a cikk örökli. A Részleteknél az üres mező alatt látszik, honnan jön az örökölt érték.')),
+    resz('datum', 'Dátumok',
+      p('A ', b('Megjelenés ideje'), ' mezőbe gépi (EDTF, ISO 8601-2) alakban írd a dátumot. A felület kiszámolja belőle a legkorábbi és legkésőbbi lehetséges napot, ez kell a kereséshez és az időbeli szűréshez.'),
+      tabla(['Írd így', 'Jelentése'], [
+        ['1986', 'valamikor 1986-ban'], ['1986-04', '1986 áprilisában'], ['1986-04-12', 'pontosan ezen a napon'],
+        ['1986-01/1986-02', 'egyetlen megjelenés valamikor január és február között'], ['1981-04-01/1981-12-13', 'a két nap között (pl. a hadiállapot előtt)'],
+        ['1981?', 'bizonytalan év'], ['198X', 'valamikor az 1980-as években'], ['1986/..', 'periodika: 1986-tól, a vége ismeretlen']]),
+      p('A kiadványon szereplő alakot (pl. „[1981]”) a Részleteknél, a „Dátum (ahogy áll)” mezőben lehet rögzíteni; ez kerül a MARC 264 $c mezőbe.'),
+      p('A dátumtípusból számolja az export a MARC 008/06 kódot:'),
+      tabla(['Dátumtípus', 'MARC', 'Megjegyzés'], szotarSorok('datum_tipus', true).map(([a, , c]) => [a, (c.match(/008\/06: ([a-z/ ]+)/) || [])[1] || '–', c.replace(/\s*MARC 008\/06:.*$/, '')]))),
+    resz('kozr', 'Közreműködők és szerepek',
+      ul([b('bizonytalan'), ': nem biztos, hogy ő a szerző/fordító (a régi táblában „?” jelölte).'],
+        [b('nincs a kiadványon'), ': a név nem szerepel a kiadványon, külső forrásból tudjuk (a régi táblában szögletes zárójel).'],
+        [b('…'), ': a forrásban szereplő névalak (pl. „Sandor Kopačsi”) és a sorrend. Az első szerző lesz a MARC-ban a fő besorolási adat (100).']),
+      p('A szerepek közül a MARC-relátorkóddal rendelkezők szabványosak, a „helyi kód” jelűek a szamizdatkutatás saját kategóriái (nincs MARC-megfelelőjük, exportkor csak szövegesen jelennek meg).'),
+      tabla(['Szerep', 'MARC-kód'], szotarSorok('szerep'))),
+    resz('entitas', 'Személyek, szervezetek, helyek, fogalmak',
+      p('Minden név és kulcsszó egyszer szerepel az adatbázisban (entitás), a tételek erre hivatkoznak. Így egy névírás javítása mindenhol érvényesül.'),
+      ul(['Személyek besorolási alakja: ', b('Vezetéknév, Utónév'), ' (pl. Kuroń, Jacek; Nagy, Jenő).'],
+        ['A ', b('névváltozatok'), ' (álnév, fedőnév, eredeti írásmód, hibás forrásbeli alak) is kereshetők.'],
+        ['Ha ugyanaz kétszer került be (pl. „Szolidaritás” és „Solidarność”), az Entitások fülön az ', b('Összevonás…'), ' gombbal egyesíthető; minden hivatkozás átkerül.'],
+        ['A ', b('típus'), ' átállítható: egy kulcsszóként felvett helynévből (pl. Toruń) hely lesz, és a MARC-ban a megfelelő mezőbe kerül.'],
+        [b('Állítások'), ': bővíthető adatok forrással és bizonyossággal (pl. tagja, vezetője, székhelye, álneve), időszakkal.'])),
+    resz('wiki', 'Wikidata és más azonosítók',
+      p('Az Entitások fülön a ', b('Wikidata-keresés'), ' gombbal kereshető meg az illető a Wikidatán (magyar, lengyel, angol, német nyelven). A kiválasztás után a felület felajánlja a VIAF-, GND-, ISNI-, GeoNames-azonosítót, a születési és halálozási évet és a koordinátákat is.'),
+      p('A MARC-exportban a Wikidata-, GeoNames- és FactGrid-hivatkozás a ', kbd('$1'), ' (valós entitás URI-ja), a VIAF, GND és ISNI a ', kbd('$0'), ' (besorolási rekord URI-ja) almezőbe kerül (MARC Proposal 2017-08).')),
+    resz('ures', 'Üres mezők: nincs adat / nem vonatkozik',
+      p('A Részleteknél az üres mezők mellett két gomb van: ', kbd('n.a.'), ' = nincs adat (lehetne, de nem tudjuk), ', kbd('n.v.'), ' = nem vonatkozik (ennél a tételnél nem értelmezhető, pl. kép alcíme). A különbség a későbbi elemzésnél számít: a „nincs adat” hiányzó információ, a „nem vonatkozik” nem az.')),
+    resz('rda', 'RDA: tartalom-, média- és hordozótípus',
+      p(b('RDA = Resource Description and Access.'), ' A mai nemzetközi katalogizálási szabvány, a korábbi angol-amerikai szabályzat (AACR2) utódja, 2010 óta használják. Nem formátum, hanem tartalmi szabályzat: azt írja le, mit és hogyan rögzítünk; a MARC az a formátum, amelyben tároljuk.'),
+      p('Három RDA-adatot rögzítünk (MARC 336–338). A samizdatanyag nagy részénél mindig ugyanaz, ezért alapból ki vannak töltve:'),
+      tabla(['Adat', 'Kérdés', 'Értékek'], [
+        ['Tartalomtípus (336)', 'Milyen formában szól a tartalom?', Object.values(S.szotar.tartalom_tipus || {}).map(r => r.cimke).join(', ')],
+        ['Médiatípus (337)', 'Kell-e eszköz az olvasásához?', Object.values(S.szotar.rda_media || {}).map(r => `${r.cimke} (${r.kod})`).join(', ')],
+        ['Hordozótípus (338)', 'Milyen fizikai hordozón van?', Object.values(S.szotar.rda_hordozo || {}).map(r => `${r.cimke} (${r.kod})`).join(', ')]]),
+      p('Csak akkor kell hozzányúlni, ha a tétel kép (állókép), egyetlen lap (pl. röplap: hordozó = lap), vagy csak mikrofilmen érhető el.')),
+    resz('marc', 'MARC-export: mi hova kerül',
+      p(b('MARC 21'), ' = a könyvtári katalógusok közös rekordformátuma. Az Export fülön három formában tölthető le: MARCXML, bináris .mrc (ezt olvassák be a könyvtári rendszerek) és MarcEdit-szöveg (.mrk, emberi szemmel olvasható). Egy tétel MARC-rekordja a tétel oldalán a ', b('MARC'), ' gombbal nézhető meg.'),
+      tabla(['MARC-mező', 'Tartalom'], MARC_TABLA)),
+    resz('munka', 'Ellenőrzendő kérdések, napló, munkatársak',
+      ul([b('Ellenőrzendő'), ': nyitott kérdések egy-egy tételhez vagy entitáshoz. Új kérdés a tétel oldalán a ', b('Kérdés'), ' gombbal; válaszolni és lezárni az Ellenőrzendő fülön lehet.'],
+        [b('Napló'), ': minden mentés, törlés és összevonás a régi és az új értékkel, a felhasználó nevével.'],
+        [b('Új munkatárs'), ' (adminisztrátor): 1) Supabase, Szamizdat projekt → Authentication → Users → Add user (Auto Confirm); 2) a felületen a Munkatársak fülön ugyanazzal az e-mail-címmel felvenni.'])),
+    resz('forras', 'Szabványok és irodalom',
+      ul([h('a', { href: 'https://www.loc.gov/marc/bibliographic/', target: '_blank', rel: 'noopener' }, 'MARC 21 Format for Bibliographic Data'), ' (Library of Congress)'],
+        [h('a', { href: 'https://www.loc.gov/marc/relators/relaterm.html', target: '_blank', rel: 'noopener' }, 'MARC Code List for Relators'), ' – szerepkódok'],
+        [h('a', { href: 'https://www.loc.gov/marc/mac/2017/2017-08.html', target: '_blank', rel: 'noopener' }, 'MARC Proposal 2017-08'), ' – $0 és $1 URI-k'],
+        [h('a', { href: 'https://www.loc.gov/standards/datetime/', target: '_blank', rel: 'noopener' }, 'Extended Date/Time Format (EDTF)'), ' – ISO 8601-2'],
+        [h('a', { href: 'https://www.rda-rsc.org/', target: '_blank', rel: 'noopener' }, 'RDA Steering Committee'), '; Oliver, C. (2010): Introducing RDA: A Guide to the Basics. Chicago: ALA Editions.'],
+        [h('a', { href: 'https://www.wikidata.org/', target: '_blank', rel: 'noopener' }, 'Wikidata'), '; Allison-Cassin, S. & Scott, D. (2018): Wikidata: a platform for your library’s linked open data. Code4Lib Journal 40.']))
+  ];
+  page.append(h('h1', {}, 'Súgó'),
+    h('div', { class: 'card' }, h('b', {}, 'Tartalom: '), ...fej.map(([id, cim], i) => [i ? ' · ' : '', h('a', { href: '#', onclick: e => { e.preventDefault(); $('#sugo-' + id)?.scrollIntoView({ behavior: 'smooth' }); } }, cim)]).flat()),
+    ...reszek);
 }
 function csvExport(db, ts) {
   const nevek = (t, f) => db.koz.filter(k => k.tetel_id === t.id && f(k)).sort((a, b) => a.sorrend - b.sorrend).map(k => db.ent.get(k.entitas_id)?.nev).join('; ');
