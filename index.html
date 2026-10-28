@@ -53,7 +53,7 @@ main{height:calc(100vh - 53px)}
 .row .sz{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:56px}
 .row .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .tw{font-size:11px;color:var(--muted)}
-.lvl{font-size:10px;font-weight:700;border-radius:3px;padding:0 4px;background:var(--line);color:var(--muted)}
+.lvl{font-size:10px;font-weight:600;border-radius:3px;padding:0 4px;min-width:38px;text-align:center;display:inline-block;background:var(--line);color:var(--muted)}
 .lvl-s{background:var(--info-soft);color:var(--info)} .lvl-m{background:var(--ok-soft);color:var(--ok)} .lvl-b{background:var(--warn-soft);color:var(--warn)}
 .ind1{padding-left:22px}.ind2{padding-left:38px}.ind3{padding-left:54px}
 .tog{width:14px;display:inline-block;color:var(--muted);font-size:11px}
@@ -705,7 +705,7 @@ function gyerekek() {
 function viewTetelek(app) {
   const list = h('div', { class: 'list', id: 'tlist' });
   const q = h('input', { type: 'text', placeholder: 'Keresés: sorszám, cím…', value: S.tq || '' });
-  const szf = h('select', {}, h('option', { value: '' }, 'minden szint'), ...opts('biblio_szint', S.tsz || '', false));
+  const szf = h('select', {}, h('option', { value: '' }, 'minden típus'), ...['s', 'b', 'a', 'm', 'c'].map(k => h('option', { value: k, selected: S.tsz === k }, SZINT_NEV[k])));
   if (!S.tsz) szf.value = '';
   const drawList = () => {
     list.innerHTML = '';
@@ -714,7 +714,7 @@ function viewTetelek(app) {
       const ch = G.get(t.id) || [];
       const r = h('div', { class: 'row ind' + ind + (S.selTetel === t.id ? ' sel' : ''), onclick: () => megnyitTetel(t.id) },
         h('span', { class: 'tog', onclick: ch.length ? ev => { ev.stopPropagation(); S.nyitott.has(t.id) ? S.nyitott.delete(t.id) : S.nyitott.add(t.id); drawList(); } : null }, ch.length ? (S.nyitott.has(t.id) ? '▾' : '▸') : ''),
-        h('span', { class: 'lvl lvl-' + t.biblio_szint }, t.biblio_szint),
+        h('span', { class: 'lvl lvl-' + t.biblio_szint, title: SZINT_NEV[t.biblio_szint] }, SZINT_ROVID[t.biblio_szint] || t.biblio_szint),
         h('span', { class: 'sz' }, t.sorszam),
         h('span', { class: 't', title: tetelCimke(t) }, t.biblio_szint === 'b' ? (t.evfolyam_szam || t.sorszam) : (t.cim || '—')),
         t.ellenorizve ? h('span', { class: 'tw', title: 'ellenőrizve' }, '✓') : null);
@@ -727,7 +727,7 @@ function viewTetelek(app) {
         (!n || norm(t.sorszam).includes(n) || norm(t.cim).includes(n) || norm(t.alcim).includes(n) || norm(t.evfolyam_szam).includes(n)))
         .sort((a, b) => a.sorszam.localeCompare(b.sorszam, 'hu', { numeric: true }));
       hits.slice(0, 500).forEach(t => list.append(h('div', { class: 'row' + (S.selTetel === t.id ? ' sel' : ''), onclick: () => megnyitTetel(t.id) },
-        h('span', { class: 'lvl lvl-' + t.biblio_szint }, t.biblio_szint), h('span', { class: 'sz' }, t.sorszam), h('span', { class: 't' }, tetelCimke(t)))));
+        h('span', { class: 'lvl lvl-' + t.biblio_szint, title: SZINT_NEV[t.biblio_szint] }, SZINT_ROVID[t.biblio_szint] || t.biblio_szint), h('span', { class: 'sz' }, t.sorszam), h('span', { class: 't' }, tetelCimke(t)))));
       if (!hits.length) list.append(h('div', { class: 'muted', style: 'padding:10px' }, 'Nincs találat.'));
     } else (G.get(0) || []).forEach(t => row(t, 0));
   };
@@ -745,14 +745,13 @@ function viewTetelek(app) {
 }
 function udvozlo() {
   return h('div', { class: 'page' }, h('h1', {}, 'Tételek'),
-    h('p', { class: 'sub' }, 'Válassz egy tételt a bal oldali listából, vagy vegyél fel újat.'),
+    h('p', { class: 'sub' }, 'Válassz egy tételt a bal oldali listából, vagy kattints az „+ Új tétel” gombra.'),
     h('div', { class: 'card' }, h('h2', {}, 'Hogyan épül fel?'),
       h('ul', {},
-        h('li', {}, h('b', {}, 's'), ' – periodika egésze (pl. Demokrata) → ', h('b', {}, 'b'), ' – egy száma → ', h('b', {}, 'a'), ' – cikk, kép, karikatúra a számban.'),
-        h('li', {}, h('b', {}, 'm'), ' – önálló kiadvány (könyv, brosúra); benne ', h('b', {}, 'a'), ' szintű részek is lehetnek.'),
-        h('li', {}, 'A kiadó, hely, dátum, technika, ár a számnál vagy a periodikánál elég egyszer megadni – a cikk örökli.'),
-        h('li', {}, 'Személyek, testületek, helyek, tárgyszavak entitásként kapcsolódnak: egyszer kell felvenni őket, utána a választóból kereshetők, és az Entitások fülön bővíthetők (Wikidata, VIAF, állítások).'),
-        h('li', {}, 'Üres mezőnél a ', h('span', { class: 'kbd' }, 'n.a.'), ' (nincs adat) és ', h('span', { class: 'kbd' }, 'n.v.'), ' (nem vonatkozik) gombbal jelölhető, miért üres.'),
+        h('li', {}, h('b', {}, 'lap'), ' – egy periodika egésze (pl. Demokrata); alatta a ', h('b', {}, 'számai'), ', azokon belül a ', h('b', {}, 'cikkek'), ' (szöveg, kép, karikatúra).'),
+        h('li', {}, h('b', {}, 'kötet'), ' – önálló kiadvány (könyv, brosúra, röplap).'),
+        h('li', {}, 'A kiadót, a helyet, a dátumot és az árat elég a számnál megadni, a cikk örökli.'),
+        h('li', {}, 'Egy szám cikkeit a „Mentés és következő cikk” gombbal lehet gyorsan egymás után felvinni.'),
         h('li', {}, 'Mentés: ', h('span', { class: 'kbd' }, 'Ctrl+S'), '.'))));
 }
 async function megnyitTetel(id, force = false) {
@@ -897,6 +896,7 @@ function edtfParse(s) {
   return { k, v, tipus };
 }
 /* ---------- egyszerűsített felvitel: rövid űrlap + Részletek ---------- */
+const SZINT_ROVID = { a: 'cikk', b: 'szám', m: 'kötet', s: 'lap', c: 'gyűjt.' };
 const SZINT_NEV = { a: 'Cikk, kép vagy rövidhír', b: 'Periodikaszám', m: 'Önálló kiadvány', s: 'Periodika', c: 'Gyűjtemény / sorozat' };
 const GYORS = {
   a: ['szulo_id', 'cim', 'alcim', 'mufaj', 'nyelv', 'eredeti_nyelv', 'oldal_pozicio', 'rovat'],
