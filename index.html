@@ -247,6 +247,8 @@ const MARC = (() => {
       const e = db.ent.get(fo.entitas_id);
       if (e) { df(e.tipus === 'testulet' ? '110' : '100', e.tipus === 'testulet' ? '2' : '1', ' ', nev(db, e, fo.szerep, fo.bizonyossag)); van1xx = true; }
     }
+    const mu = t.mu_id ? db.ent.get(t.mu_id) : null;
+    if (mu) df(van1xx ? '240' : '130', van1xx ? '1' : '0', van1xx ? '0' : ' ', [['a', mu.nev.replace(/^\[|\]$/g, '')], ...uri(db, mu.id)]);
     df('245', van1xx ? '1' : '0', String(t.cim_nemrendezo || 0), [['a', t.cim || (t.evfolyam_szam ? `[${t.evfolyam_szam}]` : null)], ['b', t.alcim], ['c', t.felelossegi_kozles]]);
     if (t.biblio_szint !== 'a') {
       df('264', ' ', '1', [['a', t.kiadas_helye_atirt], ['b', t.kiado_atirt], ['c', t.datum_atirt || t.datum_edtf]]);
@@ -277,8 +279,11 @@ const MARC = (() => {
     }
     for (const a of db.atv.filter(x => x.tetel_id === t.id)) {
       const ft = a.forras_tetel_id ? db.tetel.get(a.forras_tetel_id) : null;
-      const n = [a.utvonal_tipus && `Útvonal: ${a.utvonal_tipus}`, a.kozvetito_id && `Közvetítő: ${db.ent.get(a.kozvetito_id)?.nev}`, a.kozvetito_leiras && `Közvetítő: ${a.kozvetito_leiras}`, a.erveles && `Indoklás: ${a.erveles}`, a.bizonyossag && `Bizonyosság: ${a.bizonyossag}`].filter(Boolean).join('. ');
-      df('534', ' ', ' ', [['p', a.atvetel_tipus ? `Átvétel (${a.atvetel_tipus}):` : 'Átvétel:'], ['t', ft ? ft.cim : clean(a.forras_leiras)], ['n', n || null]]);
+      const all = (db.allomas || []).filter(x => x.atvetel_id === a.id).sort((x, y) => x.sorrend - y.sorrend)
+        .map(x => [x.hely_id && db.ent.get(x.hely_id)?.nev, x.kozvetito_id && db.ent.get(x.kozvetito_id)?.nev, x.datum_edtf].filter(Boolean).join(', ')).filter(Boolean);
+      const fe = a.forras_entitas_id ? db.ent.get(a.forras_entitas_id) : null;
+      const n = [a.utvonal_tipus && `Útvonal: ${a.utvonal_tipus}`, all.length && `Állomások: ${all.join(' → ')}`, a.forras_datum_edtf && `A forrás dátuma: ${a.forras_datum_edtf}`, a.kozvetito_id && `Közvetítő: ${db.ent.get(a.kozvetito_id)?.nev}`, a.kozvetito_leiras && `Közvetítő: ${a.kozvetito_leiras}`, a.erveles && `Indoklás: ${a.erveles}`, a.bizonyossag && `Bizonyosság: ${a.bizonyossag}`].filter(Boolean).join('. ');
+      df('534', ' ', ' ', [['p', a.atvetel_tipus ? `Átvétel (${a.atvetel_tipus}):` : 'Átvétel:'], ['a', !ft && fe ? fe.nev : null], ['t', ft ? ft.cim : clean(a.forras_leiras)], ['n', n || null]]);
       if (ft) df('787', '0', '8', [['i', `Átvétel forrása (${a.atvetel_tipus || 'típus nincs megadva'})`], ['t', ft.cim], ['w', ft.sorszam]]);
     }
     if (t.hozzaferes || t.digitalizalva) { /* jogállás a digitális példánynál */ }
@@ -766,6 +771,11 @@ async function megnyitTetel(id, force = false) {
     const [t, koz, targy, atv, pld, dig] = await Promise.all([
       sb.from('szd_tetel').select('*').eq('id', id).single(), one('szd_kozremukodes'), one('szd_targy'), one('szd_atvetel'), one('szd_peldany'), one('szd_digitalis')]);
     for (const r of [t, koz, targy, atv, pld, dig]) if (r.error) throw r.error;
+    if (atv.data.length) {
+      const { data: all, error: ae } = await sb.from('szd_atvetel_allomas').select('*').in('atvetel_id', atv.data.map(a => a.id)).order('sorrend');
+      if (ae) throw ae;
+      for (const a of atv.data) a.allomasok = all.filter(x => x.atvetel_id === a.id);
+    }
     // ősök teljes rekordja az örökléshez
     const osok = []; let pid = t.data.szulo_id;
     while (pid && osok.length < 3) { const { data } = await sb.from('szd_tetel').select('*').eq('id', pid).single(); if (!data) break; osok.push(data); pid = data.szulo_id; }
@@ -900,8 +910,8 @@ function edtfParse(s) {
 const SZINT_ROVID = { a: 'cikk', b: 'szám', m: 'kötet', s: 'lap', c: 'gyűjt.' };
 const SZINT_NEV = { a: 'Cikk, kép vagy rövidhír', b: 'Periodikaszám', m: 'Önálló kiadvány', s: 'Periodika', c: 'Gyűjtemény / sorozat' };
 const GYORS = {
-  a: ['szulo_id', 'cim', 'alcim', 'mufaj', 'nyelv', 'eredeti_nyelv', 'oldal_pozicio', 'rovat'],
-  m: ['cim', 'alcim', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'kiadvany_tipus', 'sokszorositasi_technika'],
+  a: ['szulo_id', 'cim', 'alcim', 'mufaj', 'nyelv', 'eredeti_nyelv', 'oldal_pozicio', 'rovat', 'mu_id'],
+  m: ['cim', 'alcim', 'mu_id', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'kiadvany_tipus', 'sokszorositasi_technika'],
   b: ['szulo_id', 'evfolyam_szam', 'datum_edtf', 'ar', 'sokszorositasi_technika'],
   s: ['cim', 'alcim', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf'],
   c: ['cim', 'datum_edtf']
@@ -938,6 +948,10 @@ function gyorsMezo(k, t) {
       }
     }, h('option', { value: '' }, '— válassz —'), ...csop);
     return h('div', { class: 'f wide' }, h('label', {}, m.l, h('span', { class: 'req' }, '*')), s);
+  }
+  if (k === 'mu_id') {
+    return h('div', { class: 'f wide' }, h('label', {}, 'Mű – ha ugyanennek a szövegnek más kiadása, fordítása is van', h('span', { class: 'q', title: 'Pl. ugyanaz a visszaemlékezés három lengyel kiadásban: mindhárom ugyanahhoz a műhöz tartozik. Így követhető a szöveg terjedése. Új művet a lista aljáról lehet felvenni.' }, '?')),
+      h('div', { style: 'max-width:520px' }, entPicker({ value: t.mu_id, tipusok: ['mu'], placeholder: 'Mű keresése vagy új…', onChange: id => { t.mu_id = id; S.dirty = true; } })));
   }
   if (k === 'datum_edtf') {
     const olv = h('span', { class: 'inh' }, datumOlvasva(t));
@@ -1122,25 +1136,46 @@ function blokkTargy(F) {
     h('button', { class: 'btn sm', onclick: () => { F.targy.push({ tipus: 'emlitett', sorrend: eml.length + 1 }); S.dirty = true; drawTetelForm(); } }, '+ Említett személy'));
   return [kiv, h('div', { class: 'sub', style: 'padding:0 14px' }, 'Kulcsszavak (MARC 650/651/610)'), chips, add, emlW];
 }
+function edtfMezo(o, k, kk, kv, ph = 'pl. 1986-03-04') {
+  const olv = h('span', { class: 'inh' });
+  const frissit = () => { const p = edtfParse(o[k]); olv.textContent = !o[k] ? '' : p ? `${p.k} – ${p.v}` : 'nem értelmezhető'; };
+  const inp = h('input', { type: 'text', value: o[k] ?? '', placeholder: ph, oninput: e => { o[k] = e.target.value.trim() || null; const p = edtfParse(o[k]); o[kk] = p?.k || null; o[kv] = p?.v || null; S.dirty = true; frissit(); } });
+  frissit();
+  return h('span', {}, inp, olv);
+}
 function blokkAtv(F) {
   const wrap = h('div', { class: 'rep' });
   F.atv.forEach((a, i) => {
+    a.allomasok ||= [];
     const forrasSel = h('select', { onchange: e => { a.forras_tetel_id = e.target.value ? +e.target.value : null; S.dirty = true; } },
-      h('option', { value: '' }, '— nincs az adatbázisban —'),
+      h('option', { value: '' }, '— nincs tételként felvéve —'),
       ...[...S.tetel.values()].filter(x => x.id !== F.t.id && x.biblio_szint !== 'b').sort((x, y) => x.sorszam.localeCompare(y.sorszam, 'hu', { numeric: true }))
         .map(x => h('option', { value: x.id, selected: x.id === a.forras_tetel_id }, `${x.sorszam} · ${tetelCimke(x)}`)));
+    const allW = h('div', { style: 'grid-column:1/-1' }, h('div', { class: 'sub', style: 'margin:4px 0' }, 'Útvonal állomásai (honnan hová jutott a szöveg) – a térképhez'),
+      ...a.allomasok.map((x, j) => h('div', { class: 'reprow', style: 'grid-template-columns:24px 1.4fr 1.4fr 1fr 1fr 1.2fr auto;background:var(--panel)' },
+        h('span', { class: 'muted' }, (j + 1) + '.'),
+        entPicker({ value: x.hely_id, tipusok: ['hely'], placeholder: 'Hely…', onChange: id => { x.hely_id = id; S.dirty = true; } }),
+        entPicker({ value: x.kozvetito_id, tipusok: ['szemely', 'testulet'], placeholder: 'Közvetítő…', onChange: id => { x.kozvetito_id = id; S.dirty = true; } }),
+        edtfMezo(x, 'datum_edtf', 'datum_kezdet', 'datum_veg', 'dátum'),
+        sel(x, 'bizonyossag', 'bizonyossag', false),
+        txt(x, 'megjegyzes', 'megjegyzés'),
+        h('button', { class: 'btn sm ghost', title: 'Állomás törlése', onclick: () => { a.allomasok.splice(j, 1); S.dirty = true; drawTetelForm(); } }, '✕'))),
+      h('button', { class: 'btn sm', onclick: () => { a.allomasok.push({ bizonyossag: 'biztos' }); S.dirty = true; drawTetelForm(); } }, '+ Állomás'));
     wrap.append(repSor('1fr 1fr 1fr', [
       fld('Átvétel típusa', sel(a, 'atvetel_tipus', 'atvetel_tipus')),
-      fld('Forrás tétel (ha fel van véve)', forrasSel, 'Ha a forrás is szerepel az adatbázisban, itt kösd hozzá: a MARC-ban 787-es kapcsolat lesz belőle.'),
-      fld('Forrás leírása', txt(a, 'forras_leiras', 'pl. DPA, 1986. március 4.')),
+      fld('Forrás (hírügynökség, lap, kiadó, mű)', entPicker({ value: a.forras_entitas_id, tipusok: ['testulet', 'mu', 'szemely'], placeholder: 'pl. DPA, Tygodnik Mazowsze…', onChange: id => { a.forras_entitas_id = id; S.dirty = true; } }), 'A forrás mint entitás – így a hálóban egy pontként jelenik meg, akárhány tétel veszi át.'),
+      fld('Forrás tétel (ha fel van véve)', forrasSel, 'Ha maga a forráskiadvány is szerepel az adatbázisban, itt kösd hozzá: a MARC-ban 787-es kapcsolat lesz belőle.'),
+      fld('Forrás pontos megjelölése', txt(a, 'forras_leiras', 'pl. DPA, 1986. március 4.')),
+      fld('A forrás dátuma', edtfMezo(a, 'forras_datum_edtf', 'forras_datum_kezdet', 'forras_datum_veg'), 'EDTF: 1986-03-04, 1985-12, 1979-08-27/1979-09-10'),
+      fld('Útvonal', sel(a, 'utvonal_tipus', 'utvonal_tipus')),
       fld('Közvetítő (entitás)', entPicker({ value: a.kozvetito_id, tipusok: ['szemely', 'testulet'], onChange: id => { a.kozvetito_id = id; S.dirty = true; } })),
       fld('Közvetítő (szövegesen)', txt(a, 'kozvetito_leiras')),
-      fld('Útvonal', sel(a, 'utvonal_tipus', 'utvonal_tipus')),
-      h('div', { class: 'f', style: 'grid-column:1/3' }, h('label', {}, 'Érvelés / indoklás'), txt(a, 'erveles')),
-      fld('Bizonyosság', sel(a, 'bizonyossag', 'bizonyossag'))
+      fld('Bizonyosság', sel(a, 'bizonyossag', 'bizonyossag')),
+      h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', {}, 'Érvelés / indoklás'), txt(a, 'erveles')),
+      allW
     ], () => { F.atv.splice(i, 1); S.dirty = true; drawTetelForm(); }));
   });
-  wrap.append(h('button', { class: 'btn sm', onclick: () => { F.atv.push({}); S.dirty = true; drawTetelForm(); } }, '+ Átvétel'));
+  wrap.append(h('button', { class: 'btn sm', onclick: () => { F.atv.push({ allomasok: [] }); S.dirty = true; drawTetelForm(); } }, '+ Átvétel'));
   return [wrap];
 }
 function blokkPld(F) {
@@ -1163,7 +1198,7 @@ function blokkDig(F) {
   wrap.append(h('button', { class: 'btn sm', onclick: () => { F.dig.push({}); S.dirty = true; drawTetelForm(); } }, '+ Digitális objektum'));
   return [wrap];
 }
-const TETEL_OSZLOPOK = ['id', 'sorszam', 'biblio_szint', 'szulo_id', 'evfolyam_szam', 'cim', 'alcim', 'cim_nemrendezo', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'rda_media', 'rda_hordozo', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'digitalizalva', 'bizonyossag', 'adat_forrasa', 'forras_hivatkozas', 'forras_url', 'hozzaferes', 'megjegyzes', 'annotator', 'felvitel_datuma', 'ellenorizve', 'ures_mezok'];
+const TETEL_OSZLOPOK = ['id', 'sorszam', 'biblio_szint', 'szulo_id', 'evfolyam_szam', 'cim', 'alcim', 'cim_nemrendezo', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'rda_media', 'rda_hordozo', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'digitalizalva', 'bizonyossag', 'adat_forrasa', 'forras_hivatkozas', 'forras_url', 'hozzaferes', 'megjegyzes', 'annotator', 'felvitel_datuma', 'ellenorizve', 'ures_mezok', 'mu_id'];
 const tisztit = (o, mezok) => { const r = {}; for (const k of mezok) if (k in o) r[k] = (o[k] === '' ? null : o[k]); return r; };
 async function mentTetel(kovetkezo = false) {
   const F = S.form, t = F.t;
@@ -1176,7 +1211,8 @@ async function mentTetel(kovetkezo = false) {
     szd_tetel: tisztit(t, TETEL_OSZLOPOK),
     szd_kozremukodes: F.koz.map(k => tisztit(k, ['id', 'entitas_id', 'szerep', 'sorrend', 'nev_a_forrasban', 'kikovetkeztetett', 'bizonyossag', 'megjegyzes'])),
     szd_targy: F.targy.map(k => tisztit(k, ['id', 'entitas_id', 'tipus', 'emlitesek', 'sorrend', 'megjegyzes'])),
-    szd_atvetel: F.atv.map(k => tisztit(k, ['id', 'atvetel_tipus', 'forras_tetel_id', 'forras_leiras', 'kozvetito_id', 'kozvetito_leiras', 'utvonal_tipus', 'erveles', 'bizonyossag'])),
+    szd_atvetel: F.atv.map(k => ({ ...tisztit(k, ['id', 'atvetel_tipus', 'forras_tetel_id', 'forras_entitas_id', 'forras_leiras', 'forras_datum_edtf', 'forras_datum_kezdet', 'forras_datum_veg', 'kozvetito_id', 'kozvetito_leiras', 'utvonal_tipus', 'erveles', 'bizonyossag']),
+      allomasok: (k.allomasok || []).filter(x => x.hely_id || x.kozvetito_id || x.megjegyzes).map((x, i) => ({ ...tisztit(x, ['id', 'hely_id', 'kozvetito_id', 'datum_edtf', 'datum_kezdet', 'datum_veg', 'bizonyossag', 'megjegyzes']), sorrend: i + 1 })) })),
     szd_peldany: F.pld.map(k => tisztit(k, ['id', 'orzo_id', 'jelzet', 'allapot', 'bejegyzesek', 'megjegyzes'])),
     szd_digitalis: F.dig.map(k => tisztit(k, ['id', 'uri', 'tipus', 'jogallas', 'megjegyzes']))
   };
@@ -1226,12 +1262,12 @@ async function ujKerdes(tabla, rekord_id) {
 
 /* ---------- MARC: adatgyűjtés ---------- */
 async function marcDb() {
-  const [tetel, koz, targy, atv, pld, dig] = await Promise.all([
-    fetchAll('szd_tetel'), fetchAll('szd_kozremukodes'), fetchAll('szd_targy'), fetchAll('szd_atvetel'), fetchAll('szd_peldany'), fetchAll('szd_digitalis')]);
+  const [tetel, koz, targy, atv, pld, dig, allomas] = await Promise.all([
+    fetchAll('szd_tetel'), fetchAll('szd_kozremukodes'), fetchAll('szd_targy'), fetchAll('szd_atvetel'), fetchAll('szd_peldany'), fetchAll('szd_digitalis'), fetchAll('szd_atvetel_allomas')]);
   await loadEnt();
   const szotar = {};
   for (const r of S.szotarRows) (szotar[r.lista] ||= {})[r.kod] = r;
-  return { tetel: new Map(tetel.map(x => [x.id, x])), koz, targy, atv, pld, dig, ent: S.ent, az: S.az, szotar };
+  return { tetel: new Map(tetel.map(x => [x.id, x])), koz, targy, atv, pld, dig, allomas, ent: S.ent, az: S.az, szotar };
 }
 async function marcElonezet(id) {
   const db = await marcDb();
@@ -1281,13 +1317,18 @@ async function megnyitEnt(id, force = false) {
     sb.from('szd_kozremukodes').select('tetel_id,szerep').eq('entitas_id', id), sb.from('szd_targy').select('tetel_id,tipus').eq('entitas_id', id),
     sb.from('szd_peldany').select('tetel_id').eq('orzo_id', id), sb.from('szd_atvetel').select('tetel_id').eq('kozvetito_id', id),
     sb.from('szd_allitas').select('entitas_id,tulajdonsag').eq('ertek_entitas_id', id)]);
+  const [fa, mt, al2] = await Promise.all([sb.from('szd_atvetel').select('tetel_id').eq('forras_entitas_id', id), sb.from('szd_tetel').select('id').eq('mu_id', id),
+    sb.from('szd_atvetel_allomas').select('atvetel_id').or(`hely_id.eq.${id},kozvetito_id.eq.${id}`)]);
+  let allTetel = [];
+  if (al2.data?.length) { const { data } = await sb.from('szd_atvetel').select('tetel_id').in('id', al2.data.map(x => x.atvetel_id)); allTetel = data || []; }
   if (e.error) { c.innerHTML = ''; return toast(hibaSzoveg(e.error), true); }
   const alt = (e.data.tipus === 'szemely' ? sz : e.data.tipus === 'testulet' ? te : e.data.tipus === 'hely' ? he : { data: [] }).data[0] || {};
   const tkeres = await sb.from('szd_tetel').select('id').eq('kiadas_helye_id', id);
   S.eform = {
     e: e.data, alt, nv: nv.data, az: az.data, al: al.data,
     hiv: [...kk.data.map(x => [x.tetel_id, 'közreműködő: ' + cimke('szerep', x.szerep)]), ...tg.data.map(x => [x.tetel_id, x.tipus === 'emlitett' ? 'említett' : 'kulcsszó']),
-      ...pl.data.map(x => [x.tetel_id, 'őrző intézmény']), ...av.data.map(x => [x.tetel_id, 'közvetítő']), ...(tkeres.data || []).map(x => [x.id, 'kiadás helye'])],
+      ...pl.data.map(x => [x.tetel_id, 'őrző intézmény']), ...av.data.map(x => [x.tetel_id, 'közvetítő']), ...(tkeres.data || []).map(x => [x.id, 'kiadás helye']),
+      ...(fa.data || []).map(x => [x.tetel_id, 'átvétel forrása']), ...(mt.data || []).map(x => [x.id, 'a mű kiadása']), ...allTetel.map(x => [x.tetel_id, 'útvonal-állomás'])],
     visszautal: ah.data
   };
   drawEntForm();
@@ -1551,7 +1592,8 @@ const MARC_TABLA = [
   ['336, 337, 338', 'RDA tartalom-, média- és hordozótípus (lásd az RDA részt).'],
   ['340, 365', 'Sokszorosítási technika ($d); ár.'],
   ['500, 506, 520', 'Rovat, külső forrásból megállapított közreműködők, megjegyzés; hozzáférés; tartalmi kivonat.'],
-  ['534, 787', 'Átvétel: típus, forrás, útvonal, indoklás. Ha a forrás is szerepel az adatbázisban, 787-es kapcsolat is készül.'],
+  ['130 / 240', 'A mű (egységesített cím), ha a tétel egy több kiadásban is létező szöveg kiadása; $1 Wikidata-URI.'],
+  ['534, 787', 'Átvétel: típus ($p), forrás neve ($a) és megjelölése ($t), útvonal, állomások, a forrás dátuma, indoklás ($n). Ha a forráskiadvány is szerepel az adatbázisban, 787-es kapcsolat is készül.'],
   ['600 / 610 / 650 / 651 / 647', 'Említett személyek (600), testületek (610), fogalmak (650), helyek (651), események (647); $2 local, $1 Wikidata-URI.'],
   ['655', 'Műfaj.'],
   ['773', 'A gazdadokumentum (periodika vagy kötet): cím, kiadási adatok, szám és oldal ($g), a gazdarekord azonosítója ($w).'],
@@ -1611,6 +1653,13 @@ function viewSugo(app) {
         ['Ha ugyanaz kétszer került be (pl. „Szolidaritás” és „Solidarność”), az Entitások fülön az ', b('Összevonás…'), ' gombbal egyesíthető; minden hivatkozás átkerül.'],
         ['A ', b('típus'), ' átállítható: egy kulcsszóként felvett helynévből (pl. Toruń) hely lesz, és a MARC-ban a megfelelő mezőbe kerül.'],
         [b('Állítások'), ': bővíthető adatok forrással és bizonyossággal (pl. tagja, vezetője, székhelye, álneve), időszakkal.'])),
+    resz('terjedes', 'Szövegterjedés: mű, átvétel, útvonal',
+      p('A térképes és hálózati elemzéshez három dolgot rögzítünk (a Részletek → Átvétel blokkban, illetve a műnél a rövid űrlapon):'),
+      ul([b('Mű'), ': ha ugyanannak a szövegnek több kiadása, fordítása vagy újraközlése van (pl. Kopácsi visszaemlékezésének három lengyel szamizdatkiadása), mindegyik tétel ugyanahhoz a műhöz tartozik. Ez az IFLA könyvtári referenciamodelljének mű–kiadás megkülönböztetése (Riva–Le Bœuf–Žumer 2017). A MARC-ban egységesített címként (130/240) jelenik meg.'],
+        [b('Forrás'), ': honnan vette át a tétel a szöveget. Ha lehet, entitásként (hírügynökség, lap, kiadó – pl. DPA, Tygodnik Mazowsze), dátummal; ha a forráskiadvány maga is fel van véve, „Forrás tétel”-ként. A pontos megjelölés (szám, oldal) szövegesen mellé írható.'],
+        [b('Útvonal-állomások'), ': a szöveg útja a forrástól a tételig, sorrendben – hely és/vagy közvetítő (pl. München, Ujváry „GRIFF” Verlag), dátummal és bizonyossággal. Ebből rajzolhatók ki az ívek a térképen.'],
+        [b('Útvonal típusa'), ': közvetlen, nyugati kitérő, harmadik ország, ismeretlen (Kind-Kovács 2014 a tamizdat „nyugati kitérőjéről”).']),
+      p('Bizonytalan átvételnél állítsd a bizonyosságot „valószínű” vagy „feltételezett” értékre – a vizualizáció ezt halványabb, szaggatott vonallal fogja jelölni (Drucker 2011).')),
     resz('wiki', 'Wikidata és más azonosítók',
       p('Az Entitások fülön a ', b('Wikidata-keresés'), ' gombbal kereshető meg az illető a Wikidatán (magyar, lengyel, angol, német nyelven). A kiválasztás után a felület felajánlja a VIAF-, GND-, ISNI-, GeoNames-azonosítót, a születési és halálozási évet és a koordinátákat is.'),
       p('A MARC-exportban a Wikidata-, GeoNames- és FactGrid-hivatkozás a ', kbd('$1'), ' (valós entitás URI-ja), a VIAF, GND és ISNI a ', kbd('$0'), ' (besorolási rekord URI-ja) almezőbe kerül (MARC Proposal 2017-08).')),
@@ -1637,6 +1686,9 @@ function viewSugo(app) {
         [h('a', { href: 'https://www.loc.gov/marc/mac/2017/2017-08.html', target: '_blank', rel: 'noopener' }, 'MARC Proposal 2017-08'), ' – $0 és $1 URI-k'],
         [h('a', { href: 'https://www.loc.gov/standards/datetime/', target: '_blank', rel: 'noopener' }, 'Extended Date/Time Format (EDTF)'), ' – ISO 8601-2'],
         [h('a', { href: 'https://www.rda-rsc.org/', target: '_blank', rel: 'noopener' }, 'RDA Steering Committee'), '; Oliver, C. (2010): Introducing RDA: A Guide to the Basics. Chicago: ALA Editions.'],
+        ['Riva, P., Le Bœuf, P. & Žumer, M. (2017): IFLA Library Reference Model (LRM). IFLA.'],
+        ['Kind-Kovács, F. (2014): Written Here, Published There: How Underground Literature Crossed the Iron Curtain. Budapest: CEU Press.'],
+        ['Drucker, J. (2011): Humanities Approaches to Graphical Display. Digital Humanities Quarterly 5(1).'],
         [h('a', { href: 'https://www.wikidata.org/', target: '_blank', rel: 'noopener' }, 'Wikidata'), '; Allison-Cassin, S. & Scott, D. (2018): Wikidata: a platform for your library’s linked open data. Code4Lib Journal 40.']))
   ];
   page.append(h('h1', {}, 'Súgó'),
