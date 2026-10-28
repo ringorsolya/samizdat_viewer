@@ -1,0 +1,1527 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Szamizdat-adatbázis</title>
+<style>
+:root{
+  --bg:#f6f4ef; --panel:#ffffff; --panel2:#faf8f4; --ink:#1f1d1a; --muted:#6b665d; --line:#e2ddd3; --line2:#cfc8bb;
+  --accent:#9b2c2c; --accent-ink:#ffffff; --accent-soft:#f6e7e5; --ok:#2f6b3f; --ok-soft:#e5f1e8; --warn:#8a5a00; --warn-soft:#fbf1dc;
+  --info:#2b5c8a; --info-soft:#e4eef7; --focus:#c0504d; --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#171614; --panel:#201f1c; --panel2:#262421; --ink:#ece8e1; --muted:#a39d92; --line:#36332e; --line2:#48443d;
+    --accent:#d0605a; --accent-ink:#1b0f0e; --accent-soft:#3a2321; --ok:#7cc08f; --ok-soft:#1f3326; --warn:#e2b45a; --warn-soft:#3a2f17;
+    --info:#7fb0de; --info-soft:#1d2c3a; --focus:#e07a74; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#171614; --panel:#201f1c; --panel2:#262421; --ink:#ece8e1; --muted:#a39d92; --line:#36332e; --line2:#48443d;
+  --accent:#d0605a; --accent-ink:#1b0f0e; --accent-soft:#3a2321; --ok:#7cc08f; --ok-soft:#1f3326; --warn:#e2b45a; --warn-soft:#3a2f17;
+  --info:#7fb0de; --info-soft:#1d2c3a; --focus:#e07a74; --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--info)}
+.hidden{display:none!important}
+/* fejléc */
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.brand{font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px;white-space:nowrap}
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav button{background:none;border:0;padding:6px 10px;border-radius:6px;cursor:pointer;color:var(--muted)}
+nav button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+nav button .cnt{font-size:11px;background:var(--warn-soft);color:var(--warn);border-radius:9px;padding:0 6px;margin-left:4px}
+.user{margin-left:auto;display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+/* elrendezés */
+main{height:calc(100vh - 53px)}
+.split{display:grid;grid-template-columns:minmax(260px,340px) 1fr;height:100%}
+.side{border-right:1px solid var(--line);background:var(--panel2);display:flex;flex-direction:column;min-height:0}
+.side .tools{padding:10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.side .list{overflow:auto;flex:1;padding:4px 0}
+.content{overflow:auto;padding:16px 20px 80px;min-width:0}
+.page{max-width:1100px;margin:0 auto}
+@media (max-width:820px){header{flex-wrap:wrap;gap:8px}nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto}.user{margin-left:auto}main{height:auto}.split{grid-template-columns:1fr;height:auto}.side{max-height:40vh}.content{padding:12px 16px 60px}.reprow{grid-template-columns:1fr!important}nav button{white-space:nowrap}}
+/* lista */
+.row{display:flex;gap:6px;align-items:baseline;padding:4px 10px;cursor:pointer;border-left:3px solid transparent}
+.row:hover{background:var(--panel)}
+.row.sel{background:var(--accent-soft);border-left-color:var(--accent)}
+.row .sz{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:56px}
+.row .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .tw{font-size:11px;color:var(--muted)}
+.lvl{font-size:10px;font-weight:700;border-radius:3px;padding:0 4px;background:var(--line);color:var(--muted)}
+.lvl-s{background:var(--info-soft);color:var(--info)} .lvl-m{background:var(--ok-soft);color:var(--ok)} .lvl-b{background:var(--warn-soft);color:var(--warn)}
+.ind1{padding-left:22px}.ind2{padding-left:38px}.ind3{padding-left:54px}
+.tog{width:14px;display:inline-block;color:var(--muted);font-size:11px}
+/* űrlap */
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:15px;margin:0}
+.sub{color:var(--muted);font-size:13px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 14px}
+.bar .grow{flex:1}
+.btn{border:1px solid var(--line2);background:var(--panel);padding:6px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.sm{padding:2px 8px;font-size:12px}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn.danger{color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+details.blk{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;box-shadow:var(--shadow)}
+details.blk>summary{list-style:none;cursor:pointer;padding:9px 14px;font-weight:700;font-size:12px;letter-spacing:.06em;color:var(--muted);display:flex;gap:8px;align-items:center}
+details.blk>summary::-webkit-details-marker{display:none}
+details.blk>summary::before{content:"▸";transition:transform .15s}
+details.blk[open]>summary::before{transform:rotate(90deg)}
+details.blk>summary .hint{font-weight:400;letter-spacing:0;text-transform:none;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:10px 14px;padding:4px 14px 14px}
+.f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.f.wide{grid-column:1/-1}
+.f label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.f label .req{color:var(--accent)}
+.f label .q{cursor:help;border:1px solid var(--line2);border-radius:50%;width:14px;height:14px;font-size:10px;display:inline-flex;align-items:center;justify-content:center}
+input[type=text],input[type=number],input[type=date],input[type=email],input[type=password],select,textarea{width:100%;border:1px solid var(--line2);background:var(--panel);border-radius:6px;padding:6px 8px;min-width:0}
+textarea{min-height:90px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:-1px;border-color:transparent}
+.inh{font-size:11px;color:var(--info)}
+.ures{display:inline-flex;gap:2px;margin-left:auto}
+.ures button{border:1px solid var(--line2);background:none;border-radius:4px;font-size:10px;padding:0 4px;cursor:pointer;color:var(--muted)}
+.ures button.on{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.chk{display:flex;gap:6px;align-items:center;font-size:13px}
+/* ismétlődő sorok */
+.rep{padding:4px 14px 14px}
+.reprow{display:grid;gap:8px;align-items:end;padding:8px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;background:var(--panel2)}
+.reprow .x{align-self:start}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 6px}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;padding:2px 4px 2px 10px;font-size:13px}
+.chip button{border:0;background:none;cursor:pointer;color:var(--muted);padding:0 4px}
+.badge{font-size:10px;border-radius:3px;padding:0 4px;background:var(--line);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.b-szemely{background:var(--info-soft);color:var(--info)} .b-testulet{background:var(--ok-soft);color:var(--ok)} .b-hely{background:var(--warn-soft);color:var(--warn)} .b-fogalom{background:var(--line);color:var(--muted)} .b-esemeny{background:var(--accent-soft);color:var(--accent)}
+/* entitásválasztó */
+.ep{position:relative}
+.ep .dd{position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--panel);border:1px solid var(--line2);border-radius:6px;box-shadow:var(--shadow);max-height:280px;overflow:auto;margin-top:2px}
+.ep .dd div{padding:5px 8px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.ep .dd div.on,.ep .dd div:hover{background:var(--accent-soft)}
+.ep .dd .v{font-size:11px;color:var(--muted)}
+.ep .dd .new{color:var(--accent);font-weight:600;border-top:1px solid var(--line)}
+.ep .chosen{display:flex;gap:6px;align-items:center;border:1px solid var(--line2);border-radius:6px;padding:5px 8px;background:var(--panel);min-height:33px}
+.ep .chosen .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* egyéb */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono);font-size:12px}
+pre.marc{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:60vh}
+table.t{border-collapse:collapse;width:100%;font-size:13px}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+table.t th{color:var(--muted);font-weight:600;font-size:12px}
+#toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:6px;align-items:center;max-width:90vw}
+.toast{background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:6px;box-shadow:var(--shadow)}
+.toast.err{background:var(--accent);color:var(--accent-ink)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:90;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--panel);border-radius:10px;box-shadow:var(--shadow);max-width:640px;width:100%;max-height:90vh;overflow:auto;padding:16px}
+.modal h2{margin-bottom:10px}
+.login{max-width:380px;margin:10vh auto;padding:24px}
+.login h1{margin-bottom:12px}
+.login .f{margin-bottom:10px}
+.note{background:var(--info-soft);color:var(--ink);border-radius:6px;padding:8px 10px;font-size:13px}
+.warnbox{background:var(--warn-soft);border-radius:6px;padding:8px 10px;font-size:13px}
+.qlist .q{border-left:3px solid var(--warn);padding:6px 10px;margin-bottom:8px;background:var(--panel)}
+.qlist .q.lezart{border-left-color:var(--ok);opacity:.75}
+.wdres{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:6px;display:flex;gap:8px;align-items:center}
+.wdres .d{flex:1;min-width:0}
+.wdres .d .l{font-weight:600}
+.wdres .d .s{font-size:12px;color:var(--muted)}
+.diff{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+</style>
+</head>
+<body>
+<header id="hdr" class="hidden">
+  <div class="brand">Szamizdat-adatbázis</div>
+  <nav id="nav">
+    <button data-v="tetelek">Tételek</button>
+    <button data-v="entitasok">Entitások</button>
+    <button data-v="ellenorzendo">Ellenőrzendő <span class="cnt hidden" id="ellcnt"></span></button>
+    <button data-v="export">Export</button>
+    <button data-v="szotarak">Szótárak</button>
+    <button data-v="naplo">Napló</button>
+  </nav>
+  <div class="user"><span id="whoami"></span>
+    <button class="btn sm ghost" id="themeBtn" title="Világos/sötét">◐</button>
+    <button class="btn sm" id="pwBtn">Jelszó</button>
+    <button class="btn sm" id="logoutBtn">Kilépés</button></div>
+</header>
+<main id="app"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* =====================================================================
+   MARC-EXPORT (tiszta függvények – a felülettől függetlenül is futtatható)
+   ===================================================================== */
+/* MARC-BEGIN */
+const MARC = (() => {
+  const pad = (s, n, c = ' ') => (String(s ?? '') + c.repeat(n)).slice(0, n);
+  const yr = d => d ? String(d).slice(0, 4) : null;
+  const clean = s => s == null ? null : String(s).replace(/\s*\n\s*/g, ' ').trim() || null;
+
+  // a tétel szülőláncán felfelé örökölt érték
+  function eff(db, t, k) {
+    let x = t, guard = 0;
+    while (x && guard++ < 5) {
+      if (x[k] !== null && x[k] !== undefined && x[k] !== '') return x[k];
+      x = x.szulo_id ? db.tetel.get(x.szulo_id) : null;
+    }
+    return null;
+  }
+  function szk(db, lista, kod) { return db.szotar[lista]?.[kod] || null; }
+  function uri(db, entId) {
+    const out = [];
+    for (const a of (db.az.get(entId) || [])) {
+      const s = szk(db, 'azonosito_rendszer', a.rendszer);
+      if (!s || !s.leiras) continue;
+      const u = s.leiras.replace('{id}', a.ertek);
+      out.push([s.marc_kod === '$0' ? '0' : '1', u]);
+    }
+    return out.sort((a, b) => a[0].localeCompare(b[0]));
+  }
+  function datum(db, t) {
+    const tip = eff(db, t, 'datum_tipus'), k = eff(db, t, 'datum_kezdet'), v = eff(db, t, 'datum_veg');
+    const y1 = yr(k), y2 = yr(v);
+    if (!tip || tip === 'ismeretlen' || !y1) return ['n', 'uuuu', 'uuuu'];
+    if (tip === 'pontos') return ['e', y1, String(k).slice(5, 7) + String(k).slice(8, 10)];
+    if (tip === 'tartam') {
+      if (t.biblio_szint === 'c') return ['i', y1, y2 || y1];
+      return y2 ? ['d', y1, y2] : ['u', y1, 'uuuu'];
+    }
+    if (tip === 'becsult') return ['q', y1, y2 || y1];
+    if (tip === 'intervallum' && y2 && y2 !== y1) return ['q', y1, y2];
+    return ['s', y1, '    '];
+  }
+  function f008(db, t) {
+    const fd = String(t.felvitel_datuma || t.letrehozva || '').slice(0, 10);
+    const ymd = fd.length === 10 ? fd.slice(2, 4) + fd.slice(5, 7) + fd.slice(8, 10) : '||||||';
+    const [dt, d1, d2] = datum(db, t);
+    const orsz = szk(db, 'orszag_kod', eff(db, t, 'orszag_kod'))?.marc_kod || 'xx';
+    const ny = szk(db, 'nyelv', t.nyelv || eff(db, t, 'nyelv'))?.marc_kod || '|||';
+    return ymd + dt + pad(d1, 4) + pad(d2, 4) + pad(orsz, 3) + '|'.repeat(17) + pad(ny, 3) + ' d';
+  }
+  function nev(db, e, szerep, biz, extra = []) {
+    const sf = [['a', e.nev]];
+    const sz = szk(db, 'szerep', szerep);
+    if (sz) sf.push(['e', sz.cimke + (biz && biz !== 'biztos' ? ` (${biz})` : '')]);
+    if (sz?.marc_kod) sf.push(['4', sz.marc_kod]);
+    return sf.concat(extra, uri(db, e.id));
+  }
+  function felszin(db, t) {   // a tétel közvetlen szülő-periodikája / kötete
+    return t.szulo_id ? db.tetel.get(t.szulo_id) : null;
+  }
+  function gyoker(db, t) { let x = t; while (x && x.szulo_id) x = db.tetel.get(x.szulo_id); return x; }
+
+  function rekord(db, t) {
+    const F = [];
+    const cf = (tag, value) => F.push({ tag, value });
+    const df = (tag, i1, i2, sf) => { sf = sf.filter(s => s[1] !== null && s[1] !== undefined && s[1] !== ''); if (sf.length) F.push({ tag, ind1: i1, ind2: i2, sf }); };
+    const szulo = felszin(db, t);
+    const gazda = t.biblio_szint === 'a' ? (szulo?.biblio_szint === 'b' ? gyoker(db, t) : szulo) : null;
+    // Leader
+    const tt = eff(db, t, 'tartalom_tipus');
+    const l06 = tt === 'állókép' ? 'k' : tt === 'kotta' ? 'c' : 'a';
+    const l07 = t.biblio_szint === 'a' ? (szulo?.biblio_szint === 'b' || szulo?.biblio_szint === 's' ? 'b' : 'a') : t.biblio_szint;
+    const leader = '00000n' + l06 + l07 + ' a2200000' + (t.ellenorizve ? ' ' : '5') + 'c 4500';
+    cf('001', t.sorszam);
+    const mod = String(t.modositva || t.letrehozva || '').replace(/[^0-9]/g, '').slice(0, 14);
+    if (mod.length === 14) cf('005', mod + '.0');
+    cf('008', f008(db, t));
+    df('040', ' ', ' ', [['b', 'hun'], ['e', 'rda']]);
+    const ny = szk(db, 'nyelv', t.nyelv)?.marc_kod, eny = szk(db, 'nyelv', t.eredeti_nyelv)?.marc_kod;
+    if (ny && eny && ny !== eny) df('041', '1', ' ', [['a', ny], ['h', eny]]);
+
+    const koz = db.koz.filter(k => k.tetel_id === t.id).sort((a, b) => (a.sorrend || 0) - (b.sorrend || 0) || a.id - b.id);
+    const fo = koz.find(k => k.szerep === 'aut');
+    let van1xx = false;
+    if (fo) {
+      const e = db.ent.get(fo.entitas_id);
+      if (e) { df(e.tipus === 'testulet' ? '110' : '100', e.tipus === 'testulet' ? '2' : '1', ' ', nev(db, e, fo.szerep, fo.bizonyossag)); van1xx = true; }
+    }
+    df('245', van1xx ? '1' : '0', String(t.cim_nemrendezo || 0), [['a', t.cim || (t.evfolyam_szam ? `[${t.evfolyam_szam}]` : null)], ['b', t.alcim], ['c', t.felelossegi_kozles]]);
+    if (t.biblio_szint !== 'a') {
+      df('264', ' ', '1', [['a', t.kiadas_helye_atirt], ['b', t.kiado_atirt], ['c', t.datum_atirt]]);
+    }
+    if (t.terjedelem_oldal) df('300', ' ', ' ', [['a', `${t.terjedelem_oldal} oldal`]]);
+    const ctype = { 'szöveg': [['text', 'txt']], 'állókép': [['still image', 'sti']], 'vegyes (szöveg + kép)': [['text', 'txt'], ['still image', 'sti']], 'kotta': [['notated music', 'ntm']] }[tt] || [];
+    ctype.forEach(([a, b]) => df('336', ' ', ' ', [['a', a], ['b', b], ['2', 'rdacontent']]));
+    const media = { unmediated: 'n', computer: 'c', microform: 'h' }, carrier = { volume: 'nc', sheet: 'nb', 'online resource': 'cr', 'microfilm reel': 'hd' };
+    const rm = eff(db, t, 'rda_media'), rh = eff(db, t, 'rda_hordozo');
+    if (rm) df('337', ' ', ' ', [['a', rm], ['b', media[rm]], ['2', 'rdamedia']]);
+    if (rh) df('338', ' ', ' ', [['a', rh], ['b', carrier[rh]], ['2', 'rdacarrier']]);
+    const tech = eff(db, t, 'sokszorositasi_technika');
+    if (tech) df('340', ' ', ' ', [['d', tech]]);
+    if (t.biblio_szint === 's' && t.datum_atirt) df('362', '1', ' ', [['a', `Megjelenés: ${t.datum_atirt}`]]);
+    if (t.biblio_szint !== 'a' && t.ar) df('365', ' ', ' ', [['b', t.ar]]);
+    if (t.sorozat) df('490', '0', ' ', [['a', t.sorozat]]);
+    if (t.rovat) df('500', ' ', ' ', [['a', `Rovat: ${t.rovat}`]]);
+    if (t.peldanyszam) df('500', ' ', ' ', [['a', `Példányszám: ${t.peldanyszam}`]]);
+    const kik = koz.filter(k => k.kikovetkeztetett).map(k => `${db.ent.get(k.entitas_id)?.nev} (${szk(db, 'szerep', k.szerep)?.cimke || k.szerep}${k.bizonyossag && k.bizonyossag !== 'biztos' ? ', ' + k.bizonyossag : ''})`);
+    if (kik.length) df('500', ' ', ' ', [['a', `A kiadványon nem szereplő, külső forrásból megállapított közreműködő: ${kik.join('; ')}`]]);
+    if (t.megjegyzes) df('500', ' ', ' ', [['a', clean(t.megjegyzes)]]);
+    const hf = t.hozzaferes;
+    if (hf) df('506', hf === 'nyilvános' ? '0' : '1', ' ', [['a', hf === 'nyilvános' ? 'Nyilvános' : hf === 'kutatói' ? 'Kutatói hozzáférés' : 'Zárt']]);
+    if (t.tartalmi_kivonat) {
+      let k = clean(t.tartalmi_kivonat);
+      while (new TextEncoder().encode(k).length > 9000) k = k.slice(0, Math.floor(k.length * 0.9)) + ' […]';
+      df('520', ' ', ' ', [['a', k]]);
+    }
+    for (const a of db.atv.filter(x => x.tetel_id === t.id)) {
+      const ft = a.forras_tetel_id ? db.tetel.get(a.forras_tetel_id) : null;
+      const n = [a.utvonal_tipus && `Útvonal: ${a.utvonal_tipus}`, a.kozvetito_id && `Közvetítő: ${db.ent.get(a.kozvetito_id)?.nev}`, a.kozvetito_leiras && `Közvetítő: ${a.kozvetito_leiras}`, a.erveles && `Indoklás: ${a.erveles}`, a.bizonyossag && `Bizonyosság: ${a.bizonyossag}`].filter(Boolean).join('. ');
+      df('534', ' ', ' ', [['p', a.atvetel_tipus ? `Átvétel (${a.atvetel_tipus}):` : 'Átvétel:'], ['t', ft ? ft.cim : clean(a.forras_leiras)], ['n', n || null]]);
+      if (ft) df('787', '0', '8', [['i', `Átvétel forrása (${a.atvetel_tipus || 'típus nincs megadva'})`], ['t', ft.cim], ['w', ft.sorszam]]);
+    }
+    if (t.hozzaferes || t.digitalizalva) { /* jogállás a digitális példánynál */ }
+    const targy = db.targy.filter(x => x.tetel_id === t.id).sort((a, b) => (a.tipus > b.tipus ? -1 : a.tipus < b.tipus ? 1 : 0) || (a.sorrend || 0) - (b.sorrend || 0));
+    for (const x of targy) {
+      const e = db.ent.get(x.entitas_id); if (!e) continue;
+      const [tag, i1] = { szemely: ['600', '1'], testulet: ['610', '2'], hely: ['651', ' '], esemeny: ['647', ' '], fogalom: ['650', ' '] }[e.tipus] || ['650', ' '];
+      df(tag, i1, '7', [['a', e.nev], ...uri(db, e.id), ['2', 'local']]);
+    }
+    const mf = t.mufaj;
+    if (mf) df('655', ' ', '7', [['a', mf], ['2', 'local']]);
+    for (const k of koz) {
+      if (k === fo) continue;
+      if (k.szerep === 'pbl' && t.biblio_szint === 'a') continue;
+      const e = db.ent.get(k.entitas_id); if (!e) continue;
+      df(e.tipus === 'testulet' ? '710' : '700', e.tipus === 'testulet' ? '2' : '1', ' ', nev(db, e, k.szerep, k.bizonyossag));
+    }
+    if (t.biblio_szint === 'a' && szulo) {
+      const iss = szulo.biblio_szint === 'b' ? szulo : null;
+      const g = [iss?.evfolyam_szam, iss?.datum_atirt && `(${iss.datum_atirt})`].filter(Boolean).join(' ');
+      const gg = [g, t.oldal_pozicio && `${t.oldal_pozicio}. o.`].filter(Boolean).join(', ');
+      const hely = eff(db, szulo, 'kiadas_helye_atirt'), kiado = eff(db, szulo, 'kiado_atirt'), dd = eff(db, szulo, 'datum_atirt');
+      const d = [hely && kiado ? `${hely} : ${kiado}` : (hely || kiado), dd].filter(Boolean).join(', ');
+      const gaut = db.koz.find(k => k.tetel_id === gazda?.id && k.szerep === 'aut');
+      const ge = gaut ? db.ent.get(gaut.entitas_id) : null;
+      const s7 = (ge ? (ge.tipus === 'testulet' ? 'c2' : 'p1') : 'nn') + 'a' + (gazda?.biblio_szint === 's' ? 's' : 'm');
+      df('773', '0', ' ', [['7', s7], ['a', ge?.nev], ['t', gazda?.cim], ['d', d || null], ['g', gg || null], ['w', gazda?.sorszam]]);
+    }
+    for (const p of db.pld.filter(x => x.tetel_id === t.id)) {
+      df('852', ' ', ' ', [['a', p.orzo_id ? db.ent.get(p.orzo_id)?.nev : null], ['j', p.jelzet], ['z', [p.allapot && `Állapot: ${p.allapot}`, p.bejegyzesek && `Bejegyzések: ${p.bejegyzesek}`, p.megjegyzes].filter(Boolean).join('. ') || null]]);
+    }
+    for (const d of db.dig.filter(x => x.tetel_id === t.id)) {
+      if (d.uri) df('856', '4', '0', [['u', d.uri], ['3', d.tipus], ['z', d.jogallas && `Jogállás: ${d.jogallas}`]]);
+    }
+    df('900', ' ', ' ', [['a', t.bizonyossag], ['b', t.adat_forrasa], ['c', t.forras_hivatkozas], ['d', t.annotator], ['e', t.ellenorizve ? 'ellenőrizve' : 'nem ellenőrzött'], ['f', t.forras_url], ['g', t.digitalizalva && `digitalizálva: ${t.digitalizalva}`]]);
+    const um = Object.entries(t.ures_mezok || {});
+    if (um.length) df('901', ' ', ' ', um.map(([k, v]) => ['a', `${k}: ${v === 'na' ? 'nincs adat' : 'nem vonatkozik'}`]));
+    return { leader, fields: F };
+  }
+
+  const XESC = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  function iso2709(r) {
+    const enc = new TextEncoder();
+    const data = [], dir = [];
+    let pos = 0;
+    for (const f of r.fields) {
+      const body = f.value !== undefined ? f.value + '\x1e' : f.ind1 + f.ind2 + f.sf.map(([c, v]) => '\x1f' + c + v).join('') + '\x1e';
+      const b = enc.encode(body);
+      if (b.length > 9999) throw new Error(`A(z) ${f.tag} mező túl hosszú (${b.length} bájt).`);
+      dir.push(f.tag + String(b.length).padStart(4, '0') + String(pos).padStart(5, '0'));
+      data.push(b); pos += b.length;
+    }
+    const dirStr = dir.join('') + '\x1e';
+    const base = 24 + dirStr.length;
+    const total = base + pos + 1;
+    const leader = String(total).padStart(5, '0') + r.leader.slice(5, 12) + String(base).padStart(5, '0') + r.leader.slice(17);
+    const parts = [enc.encode(leader + dirStr), ...data, enc.encode('\x1d')];
+    const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+    let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+  function xml(recs) {
+    const out = ['<?xml version="1.0" encoding="UTF-8"?>', '<collection xmlns="http://www.loc.gov/MARC21/slim">'];
+    for (const r of recs) {
+      const bytes = iso2709(r);
+      const lead = new TextDecoder().decode(bytes.slice(0, 24));
+      out.push('  <record>', `    <leader>${XESC(lead)}</leader>`);
+      for (const f of r.fields) {
+        if (f.value !== undefined) out.push(`    <controlfield tag="${f.tag}">${XESC(f.value)}</controlfield>`);
+        else {
+          out.push(`    <datafield tag="${f.tag}" ind1="${f.ind1}" ind2="${f.ind2}">`);
+          for (const [c, v] of f.sf) out.push(`      <subfield code="${c}">${XESC(v)}</subfield>`);
+          out.push('    </datafield>');
+        }
+      }
+      out.push('  </record>');
+    }
+    out.push('</collection>');
+    return out.join('\n');
+  }
+  function mrk(recs) {
+    return recs.map(r => {
+      const lead = new TextDecoder().decode(iso2709(r).slice(0, 24));
+      return ['=LDR  ' + lead.replace(/ /g, '\\'), ...r.fields.map(f => f.value !== undefined
+        ? `=${f.tag}  ${f.value.replace(/ /g, '\\')}`
+        : `=${f.tag}  ${(f.ind1 === ' ' ? '\\' : f.ind1)}${(f.ind2 === ' ' ? '\\' : f.ind2)}${f.sf.map(([c, v]) => '$' + c + v).join('')}`)].join('\n');
+    }).join('\n\n');
+  }
+  function mrc(recs) {
+    const parts = recs.map(iso2709);
+    const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+    let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+  return { rekord, xml, mrk, mrc, iso2709, eff };
+})();
+/* MARC-END */
+if (typeof module !== 'undefined') module.exports = MARC;
+</script>
+
+<script>
+/* =====================================================================
+   ALKALMAZÁS
+   ===================================================================== */
+const CFG = {
+  url: 'https://wmvvyphchrefuhyuqavd.supabase.co',
+  key: 'sb_publishable_EdxTn9Z0aXoXrexdQ5oz1w_Ms4998kE'
+};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase();
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'class') e.className = v;
+    else if (k === 'html') e.innerHTML = v;
+    else if (k === 'value') e.value = v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+}
+function toast(msg, err = false) {
+  const t = h('div', { class: 'toast' + (err ? ' err' : '') }, msg);
+  let box = $('#toasts'); if (!box) { box = h('div', { id: 'toasts' }); document.body.append(box); }
+  box.append(t); setTimeout(() => t.remove(), err ? 6000 : 2600);
+}
+function modal(title, body, buttons, onMount) {
+  return new Promise(res => {
+    const bg = h('div', { class: 'modal-bg' });
+    const close = v => { bg.remove(); res(v); };
+    const m = h('div', { class: 'modal', role: 'dialog' }, h('h2', {}, title), body,
+      h('div', { class: 'bar', style: 'justify-content:flex-end;margin-top:14px' },
+        ...buttons.map(b => h('button', { class: 'btn' + (b.pri ? ' pri' : ''), onclick: () => close(b.v) }, b.l))));
+    bg.addEventListener('mousedown', e => { if (e.target === bg) close(null); });
+    bg.append(m); document.body.append(bg);
+    if (onMount) onMount(close);
+    setTimeout(() => (m.querySelector('input,select,textarea') || m.querySelector('.btn.pri'))?.focus(), 30);
+  });
+}
+const confirmBox = (title, text, ok = 'Igen') => modal(title, h('p', {}, text), [{ l: 'Mégse', v: false }, { l: ok, v: true, pri: true }]);
+function hibaSzoveg(e) { return e?.message || e?.error_description || String(e); }
+
+let sb = null;
+const S = {
+  email: null, admin: false,
+  szotar: {}, szotarRows: [], kodmezo: [], tulajdonsag: [],
+  ent: new Map(), az: new Map(),
+  tetel: new Map(),
+  view: 'tetelek', selTetel: null, selEnt: null, form: null, eform: null, dirty: false,
+  nyitott: new Set(), ellenorzendo: []
+};
+
+/* ---------- adatbetöltés ---------- */
+async function fetchAll(table, select = '*', order = 'id', filter = null) {
+  const out = []; const step = 1000;
+  for (let i = 0; ; i += step) {
+    let q = sb.from(table).select(select).range(i, i + step - 1);
+    if (order) q = q.order(order);
+    if (filter) q = filter(q);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < step) break;
+  }
+  return out;
+}
+async function loadAlap() {
+  const [sz, km, tu] = await Promise.all([
+    fetchAll('szd_szotar', '*', 'sorrend'), fetchAll('szd_kodmezo', '*', null), fetchAll('szd_tulajdonsag', '*', 'sorrend')]);
+  S.szotarRows = sz; S.kodmezo = km; S.tulajdonsag = tu;
+  S.szotar = {};
+  for (const r of sz) (S.szotar[r.lista] ||= {})[r.kod] = r;
+  await Promise.all([loadEnt(), loadTetelLista(), loadEll()]);
+}
+async function loadEnt() {
+  const [e, nv, az] = await Promise.all([
+    fetchAll('szd_entitas', 'id,tipus,nev,leiras,ellenorizve'),
+    fetchAll('szd_nevvaltozat', 'id,entitas_id,nev'),
+    fetchAll('szd_azonosito', 'id,entitas_id,rendszer,ertek,cimke')]);
+  S.ent = new Map(e.map(x => [x.id, { ...x, valt: [] }]));
+  for (const v of nv) S.ent.get(v.entitas_id)?.valt.push(v.nev);
+  S.az = new Map();
+  for (const a of az) { if (!S.az.has(a.entitas_id)) S.az.set(a.entitas_id, []); S.az.get(a.entitas_id).push(a); }
+}
+async function loadTetelLista() {
+  const t = await fetchAll('szd_tetel', 'id,sorszam,biblio_szint,szulo_id,cim,alcim,evfolyam_szam,ellenorizve,datum_edtf,rovat', 'sorszam');
+  S.tetel = new Map(t.map(x => [x.id, x]));
+}
+async function loadEll() {
+  S.ellenorzendo = await fetchAll('szd_ellenorzendo', '*', 'id');
+  const n = S.ellenorzendo.filter(x => x.allapot === 'nyitott').length;
+  const c = $('#ellcnt'); if (c) { c.textContent = n; c.classList.toggle('hidden', !n); }
+}
+const opts = (lista, cur, ures = true) => {
+  const rows = Object.values(S.szotar[lista] || {}).filter(r => r.ervenyes || r.kod === cur).sort((a, b) => a.sorrend - b.sorrend);
+  const o = ures ? [h('option', { value: '' }, '—')] : [];
+  for (const r of rows) o.push(h('option', { value: r.kod, selected: r.kod === cur }, r.kod === r.cimke ? r.cimke : `${r.kod} – ${r.cimke}`));
+  if (cur && !rows.some(r => r.kod === cur)) o.push(h('option', { value: cur, selected: true }, cur + ' (?)'));
+  return o;
+};
+const cimke = (lista, kod) => S.szotar[lista]?.[kod]?.cimke || kod || '';
+
+/* ---------- bejelentkezés ---------- */
+function renderLogin(uzenet) {
+  uzenet = uzenet || S.loginMsg;
+  $('#hdr').classList.add('hidden');
+  const app = $('#app'); app.innerHTML = '';
+  const em = h('input', { type: 'email', id: 'lem', autocomplete: 'username' });
+  const pw = h('input', { type: 'password', id: 'lpw', autocomplete: 'current-password' });
+  const msg = h('div', { class: uzenet ? 'warnbox' : 'hidden' }, uzenet || '');
+  const go = async () => {
+    msg.className = 'hidden'; S.loginMsg = null;
+    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value });
+    if (error) { msg.textContent = 'Sikertelen bejelentkezés: ' + error.message; msg.className = 'warnbox'; }
+  };
+  pw.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+  const magic = location.protocol.startsWith('http') ? h('button', {
+    class: 'btn', onclick: async () => {
+      const { error } = await sb.auth.signInWithOtp({ email: em.value.trim(), options: { emailRedirectTo: location.href.split('#')[0], shouldCreateUser: false } });
+      msg.textContent = error ? 'Hiba: ' + error.message : 'Elküldtük a belépőlinket az e-mail-címre.'; msg.className = error ? 'warnbox' : 'note';
+    }
+  }, 'Belépőlink e-mailben') : null;
+  app.append(h('div', { class: 'card login' },
+    h('h1', {}, 'Szamizdat-adatbázis'),
+    h('p', { class: 'sub' }, 'Bejelentkezés a szamizdat-adatbázis fiókjával (e-mail + jelszó).'),
+    h('div', { class: 'f' }, h('label', { for: 'lem' }, 'E-mail'), em),
+    h('div', { class: 'f' }, h('label', { for: 'lpw' }, 'Jelszó'), pw),
+    msg,
+    h('div', { class: 'bar' }, h('button', { class: 'btn pri', onclick: go }, 'Belépés'), magic)));
+  em.focus();
+}
+async function startApp(session) {
+  S.email = session.user.email.toLowerCase();
+  const { data: me, error: meErr } = await sb.from('szd_munkatarsak').select('*').eq('email', S.email).maybeSingle();
+  if (meErr) {
+    S.loginMsg = 'A bejelentkezés lejárt vagy érvénytelen (' + (meErr.message || meErr.code) + '). Lépj be újra.';
+    await sb.auth.signOut({ scope: 'local' }); renderLogin(); return;
+  }
+  if (!me || !me.aktiv) {
+    S.loginMsg = `A(z) ${S.email} fiók nincs a szamizdat-adatbázis munkatársai között. Kérd meg az adminisztrátort, hogy vegyen fel.`;
+    await sb.auth.signOut(); renderLogin(); return;
+  }
+  S.admin = me.szerep === 'admin';
+  $('#whoami').textContent = me.nev || S.email;
+  $('#hdr').classList.remove('hidden');
+  $('#app').innerHTML = '<div class="page" style="padding:40px">Betöltés…</div>';
+  try { await loadAlap(); } catch (e) { toast('Betöltési hiba: ' + hibaSzoveg(e), true); return; }
+  const hash = location.hash.slice(1).split('/');
+  if (hash[0] === 'tetel' && hash[1]) { S.view = 'tetelek'; S.selTetel = +hash[1]; }
+  else if (hash[0] === 'entitas' && hash[1]) { S.view = 'entitasok'; S.selEnt = +hash[1]; }
+  else if (hash[0]) S.view = hash[0];
+  render();
+}
+
+/* ---------- navigáció ---------- */
+async function go(view, id = null) {
+  if (S.dirty && !(await confirmBox('Nem mentett változások', 'A megnyitott űrlapon nem mentett módosítások vannak. Eldobod őket?', 'Eldobom'))) return false;
+  S.dirty = false; S.view = view;
+  if (view === 'tetelek' && id !== null) S.selTetel = id;
+  if (view === 'entitasok' && id !== null) S.selEnt = id;
+  history.replaceState(null, '', '#' + view + (id ? '/' + id : ''));
+  render(); return true;
+}
+function render() {
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
+  const app = $('#app'); app.innerHTML = '';
+  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo }[S.view] || viewTetelek)(app);
+}
+
+/* =====================================================================
+   ENTITÁSVÁLASZTÓ
+   ===================================================================== */
+function entKeres(q, tipusok, max = 12) {
+  const n = norm(q).trim();
+  const out = [];
+  for (const e of S.ent.values()) {
+    if (tipusok && !tipusok.includes(e.tipus)) continue;
+    if (!n) { out.push([2, e]); continue; }
+    const nn = norm(e.nev);
+    let sc = nn.startsWith(n) ? 0 : nn.includes(n) ? 1 : 9;
+    if (sc === 9) for (const v of e.valt) { const vn = norm(v); if (vn.includes(n)) { sc = 1.5; break; } }
+    if (sc < 9) out.push([sc, e]);
+  }
+  return out.sort((a, b) => a[0] - b[0] || a[1].nev.localeCompare(b[1].nev, 'hu')).slice(0, max).map(x => x[1]);
+}
+function entPicker({ value, tipusok, onChange, placeholder = 'Keresés vagy új felvétele…' }) {
+  const wrap = h('div', { class: 'ep' });
+  const draw = () => {
+    wrap.innerHTML = '';
+    const e = value ? S.ent.get(value) : null;
+    if (e) {
+      wrap.append(h('div', { class: 'chosen' }, h('span', { class: 'badge b-' + e.tipus }, cimke('entitas_tipus', e.tipus)),
+        h('span', { class: 'n', title: e.nev }, e.nev),
+        h('button', { class: 'btn sm ghost', title: 'Entitás megnyitása', onclick: () => go('entitasok', e.id) }, '↗'),
+        h('button', { class: 'btn sm ghost', title: 'Csere', onclick: () => { value = null; onChange(null); draw(); wrap.querySelector('input')?.focus(); } }, '×')));
+      return;
+    }
+    const inp = h('input', { type: 'text', placeholder });
+    const dd = h('div', { class: 'dd hidden' });
+    let items = [], act = 0;
+    const show = () => {
+      items = entKeres(inp.value, tipusok);
+      dd.innerHTML = '';
+      items.forEach((e, i) => dd.append(h('div', { class: i === act ? 'on' : '', onmousedown: ev => { ev.preventDefault(); pick(e); } },
+        h('span', { class: 'badge b-' + e.tipus }, cimke('entitas_tipus', e.tipus)), h('span', {}, e.nev),
+        e.valt.length ? h('span', { class: 'v' }, e.valt.slice(0, 2).join(' · ')) : null)));
+      if (inp.value.trim()) dd.append(h('div', { class: 'new' + (act === items.length ? ' on' : ''), onmousedown: ev => { ev.preventDefault(); ujEnt(); } }, `+ Új: „${inp.value.trim()}”`));
+      dd.classList.toggle('hidden', !dd.children.length);
+    };
+    const pick = e => { value = e.id; onChange(e.id); draw(); };
+    const ujEnt = async () => {
+      const e = await ujEntitasDialog(inp.value.trim(), tipusok);
+      if (e) pick(e);
+    };
+    inp.addEventListener('focus', () => { act = 0; show(); });
+    inp.addEventListener('input', () => { act = 0; show(); });
+    inp.addEventListener('blur', () => setTimeout(() => dd.classList.add('hidden'), 120));
+    inp.addEventListener('keydown', ev => {
+      const n = items.length + (inp.value.trim() ? 1 : 0);
+      if (ev.key === 'ArrowDown') { act = Math.min(n - 1, act + 1); show(); ev.preventDefault(); }
+      else if (ev.key === 'ArrowUp') { act = Math.max(0, act - 1); show(); ev.preventDefault(); }
+      else if (ev.key === 'Enter') { ev.preventDefault(); if (act < items.length) pick(items[act]); else if (inp.value.trim()) ujEnt(); }
+      else if (ev.key === 'Escape') dd.classList.add('hidden');
+    });
+    wrap.append(inp, dd);
+  };
+  draw();
+  return wrap;
+}
+async function ujEntitasDialog(nev, tipusok) {
+  const tipus = h('select', {}, ...(tipusok || Object.keys(S.szotar.entitas_tipus)).map(t => h('option', { value: t }, cimke('entitas_tipus', t))));
+  const nevI = h('input', { type: 'text', value: nev });
+  const tipp = h('div', { class: 'note', style: 'margin-top:8px' }, 'Személynév besorolási alakja: „Vezetéknév, Utónév” (pl. Kuroń, Jacek; Nagy, Jenő). A forrásban szereplő alakot a közreműködésnél külön is rögzítheted.');
+  const hasonlo = entKeres(nev, null, 5);
+  const body = h('div', {}, h('div', { class: 'grid', style: 'padding:0' },
+    h('div', { class: 'f' }, h('label', {}, 'Típus'), tipus), h('div', { class: 'f' }, h('label', {}, 'Név (besorolási alak)'), nevI)), tipp,
+    hasonlo.length ? h('div', { class: 'warnbox', style: 'margin-top:8px' }, 'Hasonló, már létező entitások: ', hasonlo.map(e => e.nev).join('; ')) : null);
+  const ok = await modal('Új entitás', body, [{ l: 'Mégse', v: false }, { l: 'Létrehozás', v: true, pri: true }]);
+  if (!ok || !nevI.value.trim()) return null;
+  const { data: id, error } = await sb.rpc('szd_entitas_ment', { p: { szd_entitas: { tipus: tipus.value, nev: nevI.value.trim() } } });
+  if (error) { toast(hibaSzoveg(error), true); return null; }
+  const e = { id, tipus: tipus.value, nev: nevI.value.trim(), leiras: null, ellenorizve: false, valt: [] };
+  S.ent.set(id, e); toast('Új entitás: ' + e.nev);
+  return e;
+}
+
+/* =====================================================================
+   TÉTELEK
+   ===================================================================== */
+const URES_OK = new Set(['alcim', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'orszag_kod', 'datum_atirt', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'forras_url', 'evfolyam_szam']);
+const ORKOL = new Set(['kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'rda_media', 'rda_hordozo', 'nyelv']);
+const TBLOKK = [
+  { id: 'azon', cim: 'AZONOSÍTÁS', mezok: [
+    { k: 'sorszam', l: 'Sorszám', req: 1, help: 'Egyedi azonosító (pl. D22). A MARC-exportban ez lesz a 001-es mező.' },
+    { k: 'biblio_szint', l: 'Bibliográfiai szint', t: 'kod', lista: 'biblio_szint', req: 1, help: 'a = cikk/analitikus tétel (szülője szám vagy kötet) · b = periodikaszám (szülője a periodika) · s = periodika egésze · m = önálló kiadvány · c = gyűjtemény/sorozat' },
+    { k: 'szulo_id', l: 'Szülő tétel', t: 'szulo' },
+    { k: 'evfolyam_szam', l: 'Évfolyam, szám', csak: ['b'], help: 'Ahogy a számon szerepel, pl. „1. évfolyam, 1-2. szám”. A cikkek MARC 773 $g mezőjébe kerül.' }] },
+  { id: 'cim', cim: 'CÍM', mezok: [
+    { k: 'cim', l: 'Cím', wide: 1, help: 'Ha a kiadványon nincs cím, szögletes zárójelben adj meg leíró címet, pl. [Jerzy Popiełuszko portréja].' },
+    { k: 'alcim', l: 'Alcím / egyéb címadat' },
+    { k: 'cim_nemrendezo', l: 'Nem rendező karakterek', t: 'int', help: 'MARC 245 2. indikátor: a betűrendbe sorolásnál kihagyandó karakterek száma (pl. „A ” = 2). Magyar névelőknél is használható.' },
+    { k: 'felelossegi_kozles', l: 'Felelősségi közlés', help: 'A kiadványon szereplő formában.' },
+    { k: 'rovat', l: 'Rovat', csak: ['a'], t: 'datalist' },
+    { k: 'sorozat', l: 'Sorozat', csak: ['m', 's', 'c'] }] },
+  { id: 'impr', cim: 'IMPRESSZUM ÉS DÁTUM', hint: 'cikknél és számnál üresen hagyva a szülőtől öröklődik', mezok: [
+    { k: 'kiado_atirt', l: 'Kiadó (ahogy a kiadványon áll)', help: 'MARC 264 $b. A kiadó mint entitás a Közreműködőknél, „pbl – kiadó” szereppel rögzíthető.' },
+    { k: 'kiadas_helye_atirt', l: 'Kiadás helye (ahogy áll)', help: 'Ha nem szerepel a kiadványon, szögletes zárójelben: [Budapest].' },
+    { k: 'kiadas_helye_id', l: 'Kiadás helye (entitás)', t: 'ent', tipusok: ['hely'] },
+    { k: 'orszag_kod', l: 'Ország', t: 'kod', lista: 'orszag_kod' },
+    { k: 'datum_atirt', l: 'Dátum (ahogy áll)', help: 'MARC 264 $c, pl. [1981], 1986–' },
+    { k: 'datum_edtf', l: 'Dátum (EDTF)', t: 'edtf', help: 'Gépi alak (ISO 8601-2): 1986 · 1986-04 · 1986-01/1986-02 · 1981-04-01/1981-12-13 · 1981? · 198X · 1986/..' },
+    { k: 'datum_tipus', l: 'Dátum típusa', t: 'kod', lista: 'datum_tipus', help: 'A MARC 008/06 kódot az export ebből számolja.' },
+    { k: 'datum_kezdet', l: 'Legkorábbi lehetséges nap', t: 'date' },
+    { k: 'datum_veg', l: 'Legkésőbbi lehetséges nap', t: 'date' }] },
+  { id: 'terj', cim: 'TERJEDELEM', mezok: [
+    { k: 'oldal_pozicio', l: 'Oldal(ak) a gazdadokumentumban', csak: ['a'], help: 'pl. 25-26' },
+    { k: 'terjedelem_oldal', l: 'Terjedelem (oldal)', t: 'int' }] },
+  { id: 'nyelv', cim: 'NYELV / FORMA', mezok: [
+    { k: 'nyelv', l: 'Nyelv', t: 'kod', lista: 'nyelv' },
+    { k: 'eredeti_nyelv', l: 'Eredeti nyelv', t: 'kod', lista: 'nyelv', help: 'Fordításnál. MARC 041 $h.' },
+    { k: 'mufaj', l: 'Műfaj', t: 'kod', lista: 'mufaj' },
+    { k: 'tartalom_tipus', l: 'Tartalomtípus (RDA)', t: 'kod', lista: 'tartalom_tipus' },
+    { k: 'rda_media', l: 'Médiatípus (RDA)', t: 'kod', lista: 'rda_media' },
+    { k: 'rda_hordozo', l: 'Hordozótípus (RDA)', t: 'kod', lista: 'rda_hordozo' },
+    { k: 'kiadvany_tipus', l: 'Kiadványtípus', t: 'kod', lista: 'kiadvany_tipus' }] },
+  { id: 'elo', cim: 'ELŐÁLLÍTÁS', mezok: [
+    { k: 'peldanyszam', l: 'Példányszám' },
+    { k: 'ar', l: 'Ár', help: 'Ahogy a kiadványon áll, pénznemmel, ha van (pl. 40 zł).' },
+    { k: 'sokszorositasi_technika', l: 'Sokszorosítási technika', t: 'kod', lista: 'sokszorositasi_technika' }] },
+  { id: 'koz', cim: 'KÖZREMŰKÖDŐK', t: 'koz' },
+  { id: 'targy', cim: 'TÁRGY', t: 'targy' },
+  { id: 'atv', cim: 'ÁTVÉTEL', t: 'atv' },
+  { id: 'pld', cim: 'PÉLDÁNY', t: 'pld' },
+  { id: 'dig', cim: 'DIGITÁLIS', t: 'dig' },
+  { id: 'app', cim: 'APPARÁTUS', mezok: [
+    { k: 'bizonyossag', l: 'Bizonyosság', t: 'kod', lista: 'bizonyossag' },
+    { k: 'adat_forrasa', l: 'Adat forrása', t: 'kod', lista: 'forras_tipus' },
+    { k: 'forras_hivatkozas', l: 'Forráshivatkozás', wide: 1 },
+    { k: 'forras_url', l: 'Forrás URL' },
+    { k: 'hozzaferes', l: 'Hozzáférés', t: 'kod', lista: 'hozzaferes' },
+    { k: 'annotator', l: 'Annotátor (monogram)' },
+    { k: 'felvitel_datuma', l: 'Felvitel dátuma', t: 'date' },
+    { k: 'ellenorizve', l: 'Ellenőrizve', t: 'bool' },
+    { k: 'megjegyzes', l: 'Megjegyzés', t: 'textarea', wide: 1 }] }
+];
+const SZULO_SZINT = { a: ['b', 'm'], b: ['s'], s: ['c'], m: ['c'], c: [] };
+
+function tetelCimke(t) {
+  if (!t) return '';
+  if (t.biblio_szint === 'b') { const p = S.tetel.get(t.szulo_id); return `${p?.cim || ''} – ${t.evfolyam_szam || t.sorszam}`; }
+  return t.cim || t.sorszam;
+}
+function gyerekek() {
+  const m = new Map();
+  for (const t of S.tetel.values()) { const k = t.szulo_id || 0; if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
+  const rend = (a, b) => a.sorszam.localeCompare(b.sorszam, 'hu', { numeric: true });
+  for (const l of m.values()) l.sort(rend);
+  return m;
+}
+function viewTetelek(app) {
+  const list = h('div', { class: 'list', id: 'tlist' });
+  const q = h('input', { type: 'text', placeholder: 'Keresés: sorszám, cím…', value: S.tq || '' });
+  const szf = h('select', {}, h('option', { value: '' }, 'minden szint'), ...opts('biblio_szint', S.tsz || '', false));
+  if (!S.tsz) szf.value = '';
+  const drawList = () => {
+    list.innerHTML = '';
+    const n = norm(q.value.trim()); S.tq = q.value; S.tsz = szf.value;
+    const row = (t, ind) => {
+      const ch = G.get(t.id) || [];
+      const r = h('div', { class: 'row ind' + ind + (S.selTetel === t.id ? ' sel' : ''), onclick: () => megnyitTetel(t.id) },
+        h('span', { class: 'tog', onclick: ch.length ? ev => { ev.stopPropagation(); S.nyitott.has(t.id) ? S.nyitott.delete(t.id) : S.nyitott.add(t.id); drawList(); } : null }, ch.length ? (S.nyitott.has(t.id) ? '▾' : '▸') : ''),
+        h('span', { class: 'lvl lvl-' + t.biblio_szint }, t.biblio_szint),
+        h('span', { class: 'sz' }, t.sorszam),
+        h('span', { class: 't', title: tetelCimke(t) }, t.biblio_szint === 'b' ? (t.evfolyam_szam || t.sorszam) : (t.cim || '—')),
+        t.ellenorizve ? h('span', { class: 'tw', title: 'ellenőrizve' }, '✓') : null);
+      list.append(r);
+      if (S.nyitott.has(t.id)) ch.forEach(c => row(c, Math.min(3, ind + 1)));
+    };
+    const G = gyerekek();
+    if (n || szf.value) {
+      const hits = [...S.tetel.values()].filter(t => (!szf.value || t.biblio_szint === szf.value) &&
+        (!n || norm(t.sorszam).includes(n) || norm(t.cim).includes(n) || norm(t.alcim).includes(n) || norm(t.evfolyam_szam).includes(n)))
+        .sort((a, b) => a.sorszam.localeCompare(b.sorszam, 'hu', { numeric: true }));
+      hits.slice(0, 500).forEach(t => list.append(h('div', { class: 'row' + (S.selTetel === t.id ? ' sel' : ''), onclick: () => megnyitTetel(t.id) },
+        h('span', { class: 'lvl lvl-' + t.biblio_szint }, t.biblio_szint), h('span', { class: 'sz' }, t.sorszam), h('span', { class: 't' }, tetelCimke(t)))));
+      if (!hits.length) list.append(h('div', { class: 'muted', style: 'padding:10px' }, 'Nincs találat.'));
+    } else (G.get(0) || []).forEach(t => row(t, 0));
+  };
+  q.addEventListener('input', drawList); szf.addEventListener('change', drawList);
+  const side = h('div', { class: 'side' }, h('div', { class: 'tools' }, q, szf,
+    h('div', { class: 'bar', style: 'margin:0' }, h('button', { class: 'btn pri', onclick: () => ujTetel() }, '+ Új tétel'),
+      h('span', { class: 'muted', style: 'font-size:12px' }, `${S.tetel.size} tétel`))), list);
+  const content = h('div', { class: 'content', id: 'tcontent' });
+  app.append(h('div', { class: 'split' }, side, content));
+  // a kijelölt tétel őseinek kinyitása
+  let x = S.tetel.get(S.selTetel); while (x?.szulo_id) { S.nyitott.add(x.szulo_id); x = S.tetel.get(x.szulo_id); }
+  drawList();
+  S.drawList = drawList;
+  if (S.form) drawTetelForm(); else if (S.selTetel) megnyitTetel(S.selTetel, true); else content.append(udvozlo());
+}
+function udvozlo() {
+  return h('div', { class: 'page' }, h('h1', {}, 'Tételek'),
+    h('p', { class: 'sub' }, 'Válassz egy tételt a bal oldali listából, vagy vegyél fel újat.'),
+    h('div', { class: 'card' }, h('h2', {}, 'Hogyan épül fel?'),
+      h('ul', {},
+        h('li', {}, h('b', {}, 's'), ' – periodika egésze (pl. Demokrata) → ', h('b', {}, 'b'), ' – egy száma → ', h('b', {}, 'a'), ' – cikk, kép, karikatúra a számban.'),
+        h('li', {}, h('b', {}, 'm'), ' – önálló kiadvány (könyv, brosúra); benne ', h('b', {}, 'a'), ' szintű részek is lehetnek.'),
+        h('li', {}, 'A kiadó, hely, dátum, technika, ár a számnál vagy a periodikánál elég egyszer megadni – a cikk örökli.'),
+        h('li', {}, 'Személyek, testületek, helyek, tárgyszavak entitásként kapcsolódnak: egyszer kell felvenni őket, utána a választóból kereshetők, és az Entitások fülön bővíthetők (Wikidata, VIAF, állítások).'),
+        h('li', {}, 'Üres mezőnél a ', h('span', { class: 'kbd' }, 'n.a.'), ' (nincs adat) és ', h('span', { class: 'kbd' }, 'n.v.'), ' (nem vonatkozik) gombbal jelölhető, miért üres.'),
+        h('li', {}, 'Mentés: ', h('span', { class: 'kbd' }, 'Ctrl+S'), '.'))));
+}
+async function megnyitTetel(id, force = false) {
+  if (!force && S.selTetel === id && S.form) return;
+  if (!force && S.dirty && !(await confirmBox('Nem mentett változások', 'Eldobod a nem mentett módosításokat?', 'Eldobom'))) return;
+  S.selTetel = id; S.dirty = false;
+  history.replaceState(null, '', '#tetel/' + id);
+  const c = $('#tcontent'); if (c) c.innerHTML = '<div class="page muted">Betöltés…</div>';
+  try {
+    const one = (tb, col = 'tetel_id') => sb.from(tb).select('*').eq(col, id).order('id');
+    const [t, koz, targy, atv, pld, dig] = await Promise.all([
+      sb.from('szd_tetel').select('*').eq('id', id).single(), one('szd_kozremukodes'), one('szd_targy'), one('szd_atvetel'), one('szd_peldany'), one('szd_digitalis')]);
+    for (const r of [t, koz, targy, atv, pld, dig]) if (r.error) throw r.error;
+    // ősök teljes rekordja az örökléshez
+    const osok = []; let pid = t.data.szulo_id;
+    while (pid && osok.length < 3) { const { data } = await sb.from('szd_tetel').select('*').eq('id', pid).single(); if (!data) break; osok.push(data); pid = data.szulo_id; }
+    S.form = { t: t.data, koz: koz.data, targy: targy.data, atv: atv.data, pld: pld.data, dig: dig.data, osok };
+  } catch (e) { toast(hibaSzoveg(e), true); return; }
+  S.drawList?.();
+  drawTetelForm();
+}
+function kovSorszam(szuloId) {
+  const testverek = [...S.tetel.values()].filter(t => t.szulo_id === szuloId);
+  let minta = testverek.map(t => t.sorszam).sort((a, b) => a.localeCompare(b, 'hu', { numeric: true })).pop();
+  if (!minta) {  // a periodika többi számának cikkei alapján
+    const p = S.tetel.get(szuloId);
+    const unokak = [...S.tetel.values()].filter(t => S.tetel.get(t.szulo_id)?.szulo_id === p?.szulo_id && t.biblio_szint === 'a');
+    minta = unokak.map(t => t.sorszam).sort((a, b) => a.localeCompare(b, 'hu', { numeric: true })).pop();
+  }
+  if (!minta) return '';
+  const m = minta.match(/^(.*?)(\d+)$/);
+  if (!m) return minta + '-2';
+  let n = +m[2] + 1, cand;
+  const all = new Set([...S.tetel.values()].map(t => t.sorszam));
+  do { cand = m[1] + n++; } while (all.has(cand));
+  return cand;
+}
+async function ujTetel(alap = {}) {
+  if (S.dirty && !(await confirmBox('Nem mentett változások', 'Eldobod a nem mentett módosításokat?', 'Eldobom'))) return;
+  const osok = []; let pid = alap.szulo_id;
+  while (pid && osok.length < 3) { const { data } = await sb.from('szd_tetel').select('*').eq('id', pid).single(); if (!data) break; osok.push(data); pid = data.szulo_id; }
+  S.selTetel = null; S.dirty = true;
+  S.form = { t: { biblio_szint: 'a', ures_mezok: {}, ellenorizve: false, felvitel_datuma: new Date().toISOString().slice(0, 10), ...alap }, koz: alap._koz || [], targy: [], atv: [], pld: alap._pld || [], dig: [], osok };
+  delete S.form.t._koz; delete S.form.t._pld;
+  S.drawList?.(); drawTetelForm();
+  setTimeout(() => $('#tcontent input[data-k="cim"]')?.focus(), 50);
+}
+function orokolt(k) {
+  for (const o of S.form.osok || []) if (o[k] !== null && o[k] !== undefined && o[k] !== '') return [o[k], o];
+  return null;
+}
+function mezoElem(m, t) {
+  const v = t[m.k];
+  const set = val => {
+    t[m.k] = val === '' ? null : val;
+    if (t[m.k] !== null && t.ures_mezok?.[m.k]) { delete t.ures_mezok[m.k]; drawTetelForm(); }
+    S.dirty = true;
+  };
+  let inp;
+  switch (m.t) {
+    case 'kod': inp = h('select', { 'data-k': m.k, onchange: e => { set(e.target.value); if (m.k === 'biblio_szint') drawTetelForm(); } }, ...opts(m.lista, v)); break;
+    case 'int': inp = h('input', { type: 'number', 'data-k': m.k, value: v ?? '', oninput: e => set(e.target.value === '' ? null : parseInt(e.target.value, 10)) }); break;
+    case 'date': inp = h('input', { type: 'date', 'data-k': m.k, value: v ?? '', oninput: e => set(e.target.value) }); break;
+    case 'textarea': inp = h('textarea', { 'data-k': m.k, oninput: e => set(e.target.value) }, v ?? ''); break;
+    case 'bool': inp = h('label', { class: 'chk' }, h('input', { type: 'checkbox', 'data-k': m.k, checked: !!v, onchange: e => set(e.target.checked) }), 'igen'); break;
+    case 'ent': inp = entPicker({ value: v, tipusok: m.tipusok, onChange: id => set(id) }); break;
+    case 'szulo': {
+      const lehet = SZULO_SZINT[t.biblio_szint] || [];
+      const jel = [...S.tetel.values()].filter(x => lehet.includes(x.biblio_szint) && x.id !== t.id).sort((a, b) => a.sorszam.localeCompare(b.sorszam, 'hu', { numeric: true }));
+      inp = h('select', { 'data-k': m.k, onchange: async e => { set(e.target.value ? +e.target.value : null); await frissitOsok(); drawTetelForm(); } },
+        h('option', { value: '' }, lehet.length ? '— válassz —' : '(ennek a szintnek nincs szülője)'),
+        ...jel.map(x => h('option', { value: x.id, selected: x.id === v }, `${x.sorszam} · ${tetelCimke(x)}`)));
+      break;
+    }
+    case 'datalist': {
+      const id = 'dl-' + m.k;
+      const ertekek = [...new Set([...S.tetel.values()].map(x => x.rovat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'hu'));
+      inp = h('span', {}, h('input', { type: 'text', list: id, 'data-k': m.k, value: v ?? '', oninput: e => set(e.target.value) }), h('datalist', { id }, ...ertekek.map(r => h('option', { value: r }))));
+      break;
+    }
+    case 'edtf': inp = h('input', {
+      type: 'text', 'data-k': m.k, value: v ?? '', placeholder: 'pl. 1986-01/1986-02', oninput: e => set(e.target.value), onblur: e => {
+        const p = edtfParse(e.target.value);
+        if (p && !t.datum_kezdet && !t.datum_veg) { t.datum_kezdet = p.k; t.datum_veg = p.v; if (!t.datum_tipus) t.datum_tipus = p.tipus; drawTetelForm(); }
+      }
+    }); break;
+    default: inp = h('input', { type: 'text', 'data-k': m.k, value: v ?? '', oninput: e => set(e.target.value) });
+  }
+  const lab = h('label', {}, m.l, m.req ? h('span', { class: 'req' }, '*') : null, m.help ? h('span', { class: 'q', title: m.help }, '?') : null);
+  if (URES_OK.has(m.k) && (v === null || v === undefined || v === '')) {
+    const u = t.ures_mezok?.[m.k];
+    lab.append(h('span', { class: 'ures' },
+      ...[['na', 'n.a.', 'nincs adat'], ['nv', 'n.v.', 'nem vonatkozik']].map(([k, l, tt]) => h('button', {
+        type: 'button', class: u === k ? 'on' : '', title: tt, onclick: () => {
+          t.ures_mezok ||= {}; if (t.ures_mezok[m.k] === k) delete t.ures_mezok[m.k]; else t.ures_mezok[m.k] = k; S.dirty = true; drawTetelForm();
+        }
+      }, l))));
+  }
+  const f = h('div', { class: 'f' + (m.wide || m.t === 'textarea' ? ' wide' : '') }, lab, inp);
+  if (ORKOL.has(m.k) && (v === null || v === undefined || v === '') && ['a', 'b'].includes(t.biblio_szint)) {
+    const o = orokolt(m.k);
+    if (o) f.append(h('span', { class: 'inh' }, '↳ örökölt: ' + (m.t === 'kod' ? cimke(m.lista, o[0]) : m.t === 'ent' ? (S.ent.get(o[0])?.nev || o[0]) : o[0]) + ` (${o[1].sorszam})`));
+  }
+  return f;
+}
+async function frissitOsok() {
+  const osok = []; let pid = S.form.t.szulo_id;
+  while (pid && osok.length < 3) { const { data } = await sb.from('szd_tetel').select('*').eq('id', pid).single(); if (!data) break; osok.push(data); pid = data.szulo_id; }
+  S.form.osok = osok;
+}
+function edtfParse(s) {
+  s = String(s || '').trim(); if (!s) return null;
+  const nap = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const utolso = (y, m) => new Date(Date.UTC(+y, +m, 0)).getUTCDate();
+  const resz = (p, veg) => {
+    p = p.replace(/[?~%]/g, '');
+    if (p === '..' || p === '') return null;
+    let m;
+    if ((m = p.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return nap(m[1], m[2], m[3]);
+    if ((m = p.match(/^(\d{4})-(\d{2})$/))) return veg ? nap(m[1], m[2], utolso(m[1], m[2])) : nap(m[1], m[2], 1);
+    if ((m = p.match(/^(\d{4})$/))) return veg ? nap(m[1], 12, 31) : nap(m[1], 1, 1);
+    if ((m = p.match(/^(\d{2,3})(X{1,2})$/i))) { const y = veg ? m[1] + '9'.repeat(m[2].length) : m[1] + '0'.repeat(m[2].length); return veg ? nap(y, 12, 31) : nap(y, 1, 1); }
+    return undefined;
+  };
+  const bizonytalan = /[?~%]|X/i.test(s);
+  if (s.includes('/')) {
+    const [a, b] = s.split('/');
+    const k = resz(a, false), v = resz(b, true);
+    if (k === undefined || v === undefined) return null;
+    return { k, v, tipus: (a === '..' || b === '..' || b === '') ? 'tartam' : bizonytalan ? 'becsult' : 'intervallum' };
+  }
+  const k = resz(s, false), v = resz(s, true);
+  if (k === undefined) return null;
+  const tipus = bizonytalan ? 'becsult' : /^\d{4}-\d{2}-\d{2}$/.test(s) ? 'pontos' : /^\d{4}-\d{2}$/.test(s) ? 'honap' : 'ev';
+  return { k, v, tipus };
+}
+function drawTetelForm() {
+  const c = $('#tcontent'); if (!c) return;
+  const F = S.form, t = F.t;
+  const scroll = c.scrollTop;
+  c.innerHTML = '';
+  const page = h('div', { class: 'page' });
+  const szulo = S.tetel.get(t.szulo_id);
+  const nyitottKerdes = S.ellenorzendo.filter(q => q.tabla === 'szd_tetel' && q.rekord_id === t.id && q.allapot === 'nyitott');
+  page.append(h('div', { class: 'sub' }, t.id ? `${cimke('biblio_szint', t.biblio_szint)} · ${t.sorszam}` : 'Új tétel', szulo ? ' · ' : '', szulo ? h('a', { href: '#', onclick: e => { e.preventDefault(); megnyitTetel(szulo.id); } }, tetelCimke(szulo)) : null),
+    h('h1', {}, t.biblio_szint === 'b' ? (t.evfolyam_szam || 'Periodikaszám') : (t.cim || 'Cím nélkül')));
+  const bar = h('div', { class: 'bar' },
+    h('button', { class: 'btn pri', onclick: mentTetel }, 'Mentés'),
+    t.id ? h('button', { class: 'btn', onclick: () => megnyitTetel(t.id, true) }, 'Elvetés') : null,
+    t.id ? h('button', { class: 'btn', title: 'Új tétel ugyanazzal a szülővel, közreműködőkkel és példánnyal', onclick: masolTetel }, 'Másolat új tételként') : null,
+    t.id && (t.biblio_szint === 'b' || t.biblio_szint === 'm') ? h('button', { class: 'btn', onclick: () => ujTetel({ szulo_id: t.id, biblio_szint: 'a', sorszam: kovSorszam(t.id) }) }, '+ Cikk ebbe') : null,
+    t.id && t.biblio_szint === 's' ? h('button', { class: 'btn', onclick: () => ujTetel({ szulo_id: t.id, biblio_szint: 'b', sorszam: (t.sorszam || '') + '-' }) }, '+ Új szám') : null,
+    h('span', { class: 'grow' }),
+    t.id ? h('button', { class: 'btn', onclick: () => marcElonezet(t.id) }, 'MARC') : null,
+    t.id ? h('button', { class: 'btn', onclick: () => ujKerdes('szd_tetel', t.id) }, 'Kérdés' + (nyitottKerdes.length ? ` (${nyitottKerdes.length})` : '')) : null,
+    t.id ? h('button', { class: 'btn danger', onclick: torolTetel }, 'Törlés') : null);
+  page.append(bar);
+  if (nyitottKerdes.length) page.append(h('div', { class: 'warnbox', style: 'margin-bottom:10px' }, h('b', {}, 'Ellenőrzendő: '), nyitottKerdes.map(q => q.kerdes).join(' · ')));
+  for (const b of TBLOKK) {
+    const nyit = S.zartBlokk?.has(b.id) ? false : true;
+    const d = h('details', { class: 'blk', open: nyit, ontoggle: e => { S.zartBlokk ||= new Set(); e.target.open ? S.zartBlokk.delete(b.id) : S.zartBlokk.add(b.id); } },
+      h('summary', {}, b.cim, b.hint ? h('span', { class: 'hint' }, '— ' + b.hint) : null));
+    if (b.mezok) d.append(h('div', { class: 'grid' }, ...b.mezok.filter(m => !m.csak || m.csak.includes(t.biblio_szint)).map(m => mezoElem(m, t))));
+    else d.append(...{ koz: blokkKoz, targy: blokkTargy, atv: blokkAtv, pld: blokkPld, dig: blokkDig }[b.t](F));
+    page.append(d);
+  }
+  if (t.id) page.append(h('p', { class: 'sub' }, `Létrehozta: ${t.letrehozta || '?'}, ${String(t.letrehozva || '').slice(0, 16).replace('T', ' ')}` + (t.modositotta ? ` · Utoljára módosította: ${t.modositotta}, ${String(t.modositva).slice(0, 16).replace('T', ' ')}` : '')));
+  c.append(page);
+  c.scrollTop = scroll;
+}
+function repSor(cols, kids, onDel) {
+  return h('div', { class: 'reprow', style: `grid-template-columns:${cols} auto` }, ...kids, h('button', { class: 'btn sm ghost x', title: 'Sor törlése', onclick: onDel }, '✕'));
+}
+const fld = (l, el, help) => h('div', { class: 'f' }, h('label', {}, l, help ? h('span', { class: 'q', title: help }, '?') : null), el);
+const txt = (o, k, ph = '') => h('input', { type: 'text', value: o[k] ?? '', placeholder: ph, oninput: e => { o[k] = e.target.value || null; S.dirty = true; } });
+const sel = (o, k, lista, ures = true) => h('select', { onchange: e => { o[k] = e.target.value || null; S.dirty = true; } }, ...opts(lista, o[k], ures));
+function blokkKoz(F) {
+  const wrap = h('div', { class: 'rep' });
+  F.koz.sort((a, b) => (a.sorrend || 0) - (b.sorrend || 0));
+  F.koz.forEach((k, i) => wrap.append(repSor('2fr 1.2fr 70px 1.4fr 1fr', [
+    fld('Személy / testület', entPicker({ value: k.entitas_id, tipusok: ['szemely', 'testulet'], onChange: id => { k.entitas_id = id; S.dirty = true; } })),
+    fld('Szerep', sel(k, 'szerep', 'szerep', false)),
+    fld('Sorrend', h('input', { type: 'number', value: k.sorrend ?? 1, oninput: e => { k.sorrend = +e.target.value || 1; S.dirty = true; } }), 'Szerepen belüli sorrend. Az első szerző lesz a MARC 100-as mező.'),
+    fld('Név a forrásban', txt(k, 'nev_a_forrasban', 'ahogy a kiadványon áll'), 'Az eredeti, átírt alak, pl. „[Nagy Jenő]” vagy „Sandor Kopačsi”.'),
+    fld('Bizonyosság', sel(k, 'bizonyossag', 'bizonyossag', false)),
+    h('label', { class: 'chk', style: 'grid-column:1/-2' }, h('input', { type: 'checkbox', checked: !!k.kikovetkeztetett, onchange: e => { k.kikovetkeztetett = e.target.checked; S.dirty = true; } }), 'külső forrásból megállapított (a kiadványon nem szerepel – a régi táblában szögletes zárójel)')
+  ], () => { F.koz.splice(i, 1); S.dirty = true; drawTetelForm(); })));
+  wrap.append(h('button', { class: 'btn sm', onclick: () => { F.koz.push({ szerep: 'aut', sorrend: (F.koz.length ? Math.max(...F.koz.map(k => k.sorrend || 1)) + 1 : 1), bizonyossag: 'biztos', kikovetkeztetett: false }); S.dirty = true; drawTetelForm(); } }, '+ Közreműködő'));
+  return [wrap];
+}
+function blokkTargy(F) {
+  const t = F.t;
+  const kiv = h('div', { class: 'grid' }, mezoElem({ k: 'tartalmi_kivonat', l: 'Tartalmi kivonat', t: 'textarea', wide: 1, help: '2–3 mondat: miről szól, mi az állítása, milyen eseményre vonatkozik. MARC 520. Ha nincs teljes szöveg, ez az egyetlen kereshető tartalmi réteg.' }, t));
+  const kulcs = F.targy.filter(x => x.tipus === 'kulcsszo').sort((a, b) => (a.sorrend || 0) - (b.sorrend || 0));
+  const chips = h('div', { class: 'chips' }, ...kulcs.map(x => {
+    const e = S.ent.get(x.entitas_id);
+    return h('span', { class: 'chip' }, e ? h('span', { class: 'badge b-' + e.tipus }, cimke('entitas_tipus', e.tipus)) : null, e?.nev || '?',
+      h('button', { title: 'Eltávolítás', onclick: () => { F.targy.splice(F.targy.indexOf(x), 1); S.dirty = true; drawTetelForm(); } }, '×'));
+  }));
+  const add = h('div', { style: 'padding:0 14px 10px;max-width:420px' }, entPicker({
+    value: null, tipusok: ['fogalom', 'hely', 'testulet', 'esemeny'], placeholder: '+ kulcsszó / hely / szervezet…', onChange: id => {
+      if (id && !F.targy.some(x => x.tipus === 'kulcsszo' && x.entitas_id === id)) F.targy.push({ entitas_id: id, tipus: 'kulcsszo', sorrend: kulcs.length + 1 });
+      S.dirty = true; drawTetelForm();
+    }
+  }));
+  const eml = F.targy.filter(x => x.tipus === 'emlitett').sort((a, b) => (a.sorrend || 0) - (b.sorrend || 0));
+  const emlW = h('div', { class: 'rep' }, h('div', { class: 'sub', style: 'margin-bottom:6px' }, 'Említett személyek (akiről szól – nem aki írta)'),
+    ...eml.map(x => repSor('2fr 120px', [
+      fld('Személy', entPicker({ value: x.entitas_id, tipusok: ['szemely'], onChange: id => { x.entitas_id = id; S.dirty = true; } })),
+      fld('Említések száma', h('input', { type: 'number', min: 1, value: x.emlitesek ?? '', oninput: e => { x.emlitesek = e.target.value ? +e.target.value : null; S.dirty = true; } }), 'Nem kötelező.')
+    ], () => { F.targy.splice(F.targy.indexOf(x), 1); S.dirty = true; drawTetelForm(); })),
+    h('button', { class: 'btn sm', onclick: () => { F.targy.push({ tipus: 'emlitett', sorrend: eml.length + 1 }); S.dirty = true; drawTetelForm(); } }, '+ Említett személy'));
+  return [kiv, h('div', { class: 'sub', style: 'padding:0 14px' }, 'Kulcsszavak (MARC 650/651/610)'), chips, add, emlW];
+}
+function blokkAtv(F) {
+  const wrap = h('div', { class: 'rep' });
+  F.atv.forEach((a, i) => {
+    const forrasSel = h('select', { onchange: e => { a.forras_tetel_id = e.target.value ? +e.target.value : null; S.dirty = true; } },
+      h('option', { value: '' }, '— nincs az adatbázisban —'),
+      ...[...S.tetel.values()].filter(x => x.id !== F.t.id && x.biblio_szint !== 'b').sort((x, y) => x.sorszam.localeCompare(y.sorszam, 'hu', { numeric: true }))
+        .map(x => h('option', { value: x.id, selected: x.id === a.forras_tetel_id }, `${x.sorszam} · ${tetelCimke(x)}`)));
+    wrap.append(repSor('1fr 1fr 1fr', [
+      fld('Átvétel típusa', sel(a, 'atvetel_tipus', 'atvetel_tipus')),
+      fld('Forrás tétel (ha fel van véve)', forrasSel, 'Ha a forrás is szerepel az adatbázisban, itt kösd hozzá: a MARC-ban 787-es kapcsolat lesz belőle.'),
+      fld('Forrás leírása', txt(a, 'forras_leiras', 'pl. DPA, 1986. március 4.')),
+      fld('Közvetítő (entitás)', entPicker({ value: a.kozvetito_id, tipusok: ['szemely', 'testulet'], onChange: id => { a.kozvetito_id = id; S.dirty = true; } })),
+      fld('Közvetítő (szövegesen)', txt(a, 'kozvetito_leiras')),
+      fld('Útvonal', sel(a, 'utvonal_tipus', 'utvonal_tipus')),
+      h('div', { class: 'f', style: 'grid-column:1/3' }, h('label', {}, 'Érvelés / indoklás'), txt(a, 'erveles')),
+      fld('Bizonyosság', sel(a, 'bizonyossag', 'bizonyossag'))
+    ], () => { F.atv.splice(i, 1); S.dirty = true; drawTetelForm(); }));
+  });
+  wrap.append(h('button', { class: 'btn sm', onclick: () => { F.atv.push({}); S.dirty = true; drawTetelForm(); } }, '+ Átvétel'));
+  return [wrap];
+}
+function blokkPld(F) {
+  const wrap = h('div', { class: 'rep' });
+  F.pld.forEach((p, i) => wrap.append(repSor('1.5fr 1fr 1fr', [
+    fld('Őrző intézmény', entPicker({ value: p.orzo_id, tipusok: ['testulet', 'szemely'], onChange: id => { p.orzo_id = id; S.dirty = true; } })),
+    fld('Jelzet', txt(p, 'jelzet')), fld('Állapot', txt(p, 'allapot')),
+    fld('Bejegyzések', txt(p, 'bejegyzesek', 'kézírásos jegyzetek, pecsétek…')), h('div', { class: 'f', style: 'grid-column:2/4' }, h('label', {}, 'Megjegyzés'), txt(p, 'megjegyzes'))
+  ], () => { F.pld.splice(i, 1); S.dirty = true; drawTetelForm(); })));
+  wrap.append(h('button', { class: 'btn sm', onclick: () => { F.pld.push({}); S.dirty = true; drawTetelForm(); } }, '+ Példány'));
+  return [wrap];
+}
+function blokkDig(F) {
+  const wrap = h('div', { class: 'rep' });
+  wrap.append(h('div', { class: 'grid', style: 'padding:0 0 8px' }, fld('Digitalizálva', sel(F.t, 'digitalizalva', 'igen_nem'))));
+  F.dig.forEach((d, i) => wrap.append(repSor('2fr 1fr 1fr', [
+    fld('URI / fájlhivatkozás', txt(d, 'uri', 'https://…')), fld('Típus', sel(d, 'tipus', 'do_tipus')), fld('Jogállás', sel(d, 'jogallas', 'jogallas')),
+    h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', {}, 'Megjegyzés'), txt(d, 'megjegyzes'))
+  ], () => { F.dig.splice(i, 1); S.dirty = true; drawTetelForm(); })));
+  wrap.append(h('button', { class: 'btn sm', onclick: () => { F.dig.push({}); S.dirty = true; drawTetelForm(); } }, '+ Digitális objektum'));
+  return [wrap];
+}
+const TETEL_OSZLOPOK = ['id', 'sorszam', 'biblio_szint', 'szulo_id', 'evfolyam_szam', 'cim', 'alcim', 'cim_nemrendezo', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'rda_media', 'rda_hordozo', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'digitalizalva', 'bizonyossag', 'adat_forrasa', 'forras_hivatkozas', 'forras_url', 'hozzaferes', 'megjegyzes', 'annotator', 'felvitel_datuma', 'ellenorizve', 'ures_mezok'];
+const tisztit = (o, mezok) => { const r = {}; for (const k of mezok) if (k in o) r[k] = (o[k] === '' ? null : o[k]); return r; };
+async function mentTetel() {
+  const F = S.form, t = F.t;
+  if (!t.sorszam?.trim()) return toast('A sorszám kötelező.', true);
+  if (t.biblio_szint !== 'b' && !t.cim?.trim()) return toast('A cím kötelező (ha nincs, adj meg leíró címet szögletes zárójelben).', true);
+  if ((SZULO_SZINT[t.biblio_szint] || []).length && ['a', 'b'].includes(t.biblio_szint) && !t.szulo_id) return toast('Ehhez a szinthez szülő tétel kell.', true);
+  if (F.koz.some(k => !k.entitas_id)) return toast('Van közreműködő-sor kiválasztott személy/testület nélkül.', true);
+  if (F.targy.some(k => !k.entitas_id)) return toast('Van említett-személy sor kiválasztott személy nélkül.', true);
+  const p = {
+    szd_tetel: tisztit(t, TETEL_OSZLOPOK),
+    szd_kozremukodes: F.koz.map(k => tisztit(k, ['id', 'entitas_id', 'szerep', 'sorrend', 'nev_a_forrasban', 'kikovetkeztetett', 'bizonyossag', 'megjegyzes'])),
+    szd_targy: F.targy.map(k => tisztit(k, ['id', 'entitas_id', 'tipus', 'emlitesek', 'sorrend', 'megjegyzes'])),
+    szd_atvetel: F.atv.map(k => tisztit(k, ['id', 'atvetel_tipus', 'forras_tetel_id', 'forras_leiras', 'kozvetito_id', 'kozvetito_leiras', 'utvonal_tipus', 'erveles', 'bizonyossag'])),
+    szd_peldany: F.pld.map(k => tisztit(k, ['id', 'orzo_id', 'jelzet', 'allapot', 'bejegyzesek', 'megjegyzes'])),
+    szd_digitalis: F.dig.map(k => tisztit(k, ['id', 'uri', 'tipus', 'jogallas', 'megjegyzes']))
+  };
+  const { data: id, error } = await sb.rpc('szd_tetel_ment', { p });
+  if (error) return toast('Mentési hiba: ' + hibaSzoveg(error), true);
+  S.dirty = false;
+  const { data: lt } = await sb.from('szd_tetel').select('id,sorszam,biblio_szint,szulo_id,cim,alcim,evfolyam_szam,ellenorizve,datum_edtf,rovat').eq('id', id).single();
+  if (lt) S.tetel.set(id, lt);
+  if (lt?.szulo_id) S.nyitott.add(lt.szulo_id);
+  toast('Mentve: ' + t.sorszam);
+  await megnyitTetel(id, true);
+}
+async function masolTetel() {
+  const t = S.form.t;
+  await ujTetel({
+    szulo_id: t.szulo_id, biblio_szint: t.biblio_szint, sorszam: kovSorszam(t.szulo_id),
+    rovat: t.rovat, nyelv: t.nyelv, mufaj: t.mufaj, tartalom_tipus: t.tartalom_tipus, rda_media: t.rda_media, rda_hordozo: t.rda_hordozo,
+    digitalizalva: t.digitalizalva, bizonyossag: t.bizonyossag, adat_forrasa: t.adat_forrasa, hozzaferes: t.hozzaferes, annotator: t.annotator,
+    _koz: S.form.koz.map(({ id, tetel_id, letrehozta, letrehozva, modositotta, modositva, ...r }) => r),
+    _pld: S.form.pld.map(({ id, tetel_id, letrehozta, letrehozva, modositotta, modositva, ...r }) => ({ ...r, jelzet: null }))
+  });
+}
+async function torolTetel() {
+  const t = S.form.t;
+  if (!(await confirmBox('Tétel törlése', `Biztosan törlöd: ${t.sorszam} – ${t.cim || t.evfolyam_szam}? A kapcsolódó közreműködés-, tárgy-, átvétel-, példány- és digitálissorok is törlődnek. (A napló megőrzi a régi értékeket.)`, 'Törlöm'))) return;
+  const { error } = await sb.from('szd_tetel').delete().eq('id', t.id);
+  if (error) return toast(error.code === '23503' ? 'Nem törölhető: más tétel hivatkozik rá (pl. a cikkei).' : hibaSzoveg(error), true);
+  S.tetel.delete(t.id); S.form = null; S.selTetel = null; S.dirty = false; toast('Törölve.'); render();
+}
+async function ujKerdes(tabla, rekord_id) {
+  const ta = h('textarea', { placeholder: 'Mit kell ellenőrizni?' });
+  if (!(await modal('Ellenőrzendő kérdés', ta, [{ l: 'Mégse', v: false }, { l: 'Felvétel', v: true, pri: true }])) || !ta.value.trim()) return;
+  const { error } = await sb.from('szd_ellenorzendo').insert({ tabla, rekord_id, kerdes: ta.value.trim() });
+  if (error) return toast(hibaSzoveg(error), true);
+  await loadEll(); toast('Kérdés felvéve.'); if (S.view === 'tetelek') drawTetelForm();
+}
+
+/* ---------- MARC: adatgyűjtés ---------- */
+async function marcDb() {
+  const [tetel, koz, targy, atv, pld, dig] = await Promise.all([
+    fetchAll('szd_tetel'), fetchAll('szd_kozremukodes'), fetchAll('szd_targy'), fetchAll('szd_atvetel'), fetchAll('szd_peldany'), fetchAll('szd_digitalis')]);
+  await loadEnt();
+  const szotar = {};
+  for (const r of S.szotarRows) (szotar[r.lista] ||= {})[r.kod] = r;
+  return { tetel: new Map(tetel.map(x => [x.id, x])), koz, targy, atv, pld, dig, ent: S.ent, az: S.az, szotar };
+}
+async function marcElonezet(id) {
+  const db = await marcDb();
+  const r = MARC.rekord(db, db.tetel.get(id));
+  await modal('MARC 21 előnézet – ' + db.tetel.get(id).sorszam, h('div', {},
+    h('p', { class: 'sub' }, 'MarcEdit-szöveges (.mrk) formában. Az export fülön MARCXML-ként és bináris .mrc-ként is letölthető.'),
+    h('pre', { class: 'marc' }, MARC.mrk([r]))), [{ l: 'Bezárás', v: true, pri: true }]);
+}
+
+/* =====================================================================
+   ENTITÁSOK
+   ===================================================================== */
+function viewEntitasok(app) {
+  const list = h('div', { class: 'list' });
+  const q = h('input', { type: 'text', placeholder: 'Keresés névre, névváltozatra…', value: S.eq || '' });
+  const tf = h('select', {}, h('option', { value: '' }, 'minden típus'), ...Object.values(S.szotar.entitas_tipus || {}).map(r => h('option', { value: r.kod, selected: S.etip === r.kod }, r.cimke)));
+  const csakWd = h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: !!S.enoWd, onchange: e => { S.enoWd = e.target.checked; draw(); } }), 'csak Wikidata nélküliek');
+  const draw = () => {
+    S.eq = q.value; S.etip = tf.value;
+    list.innerHTML = '';
+    let hits = entKeres(q.value, tf.value ? [tf.value] : null, 2000);
+    if (!q.value.trim()) hits = hits.sort((a, b) => a.tipus.localeCompare(b.tipus) || a.nev.localeCompare(b.nev, 'hu'));
+    if (S.enoWd) hits = hits.filter(e => !(S.az.get(e.id) || []).some(a => a.rendszer === 'wikidata'));
+    hits.forEach(e => list.append(h('div', { class: 'row' + (S.selEnt === e.id ? ' sel' : ''), onclick: () => megnyitEnt(e.id) },
+      h('span', { class: 'badge b-' + e.tipus }, cimke('entitas_tipus', e.tipus)), h('span', { class: 't' }, e.nev),
+      (S.az.get(e.id) || []).some(a => a.rendszer === 'wikidata') ? h('span', { class: 'tw', title: 'Wikidata-azonosító van' }, 'WD') : null)));
+    if (!hits.length) list.append(h('div', { class: 'muted', style: 'padding:10px' }, 'Nincs találat.'));
+  };
+  q.addEventListener('input', draw); tf.addEventListener('change', draw);
+  const content = h('div', { class: 'content', id: 'econtent' });
+  app.append(h('div', { class: 'split' }, h('div', { class: 'side' }, h('div', { class: 'tools' }, q, tf, csakWd,
+    h('div', { class: 'bar', style: 'margin:0' }, h('button', { class: 'btn pri', onclick: async () => { const e = await ujEntitasDialog('', null); if (e) { draw(); megnyitEnt(e.id); } } }, '+ Új entitás'),
+      h('span', { class: 'muted', style: 'font-size:12px' }, `${S.ent.size} entitás`))), list), content));
+  S.drawEntList = draw; draw();
+  if (S.selEnt) megnyitEnt(S.selEnt, true);
+  else content.append(h('div', { class: 'page' }, h('h1', {}, 'Entitások'), h('p', { class: 'sub' }, 'Személyek, testületek (kiadók, szervezetek, archívumok), helyek, fogalmak és események. Itt bővíthetők további adatokkal: névváltozatok, külső azonosítók (Wikidata, VIAF, GND…), és szabadon bővíthető állítások (pl. tagja, vezetője, székhelye) forrással és bizonyossággal.')));
+}
+async function megnyitEnt(id, force = false) {
+  if (!force && S.dirty && !(await confirmBox('Nem mentett változások', 'Eldobod a nem mentett módosításokat?', 'Eldobom'))) return;
+  S.selEnt = id; S.dirty = false; history.replaceState(null, '', '#entitas/' + id);
+  S.drawEntList?.();
+  const c = $('#econtent'); c.innerHTML = '<div class="page muted">Betöltés…</div>';
+  const one = (tb, col = 'entitas_id') => sb.from(tb).select('*').eq(col, id).order(col === 'entitas_id' && tb !== 'szd_szemely' && tb !== 'szd_testulet' && tb !== 'szd_hely' ? 'id' : col);
+  const [e, sz, te, he, nv, az, al, kk, tg, pl, av, ah] = await Promise.all([
+    sb.from('szd_entitas').select('*').eq('id', id).single(), one('szd_szemely'), one('szd_testulet'), one('szd_hely'),
+    one('szd_nevvaltozat'), one('szd_azonosito'), one('szd_allitas'),
+    sb.from('szd_kozremukodes').select('tetel_id,szerep').eq('entitas_id', id), sb.from('szd_targy').select('tetel_id,tipus').eq('entitas_id', id),
+    sb.from('szd_peldany').select('tetel_id').eq('orzo_id', id), sb.from('szd_atvetel').select('tetel_id').eq('kozvetito_id', id),
+    sb.from('szd_allitas').select('entitas_id,tulajdonsag').eq('ertek_entitas_id', id)]);
+  if (e.error) { c.innerHTML = ''; return toast(hibaSzoveg(e.error), true); }
+  const alt = (e.data.tipus === 'szemely' ? sz : e.data.tipus === 'testulet' ? te : e.data.tipus === 'hely' ? he : { data: [] }).data[0] || {};
+  const tkeres = await sb.from('szd_tetel').select('id').eq('kiadas_helye_id', id);
+  S.eform = {
+    e: e.data, alt, nv: nv.data, az: az.data, al: al.data,
+    hiv: [...kk.data.map(x => [x.tetel_id, 'közreműködő: ' + cimke('szerep', x.szerep)]), ...tg.data.map(x => [x.tetel_id, x.tipus === 'emlitett' ? 'említett' : 'kulcsszó']),
+      ...pl.data.map(x => [x.tetel_id, 'őrző intézmény']), ...av.data.map(x => [x.tetel_id, 'közvetítő']), ...(tkeres.data || []).map(x => [x.id, 'kiadás helye'])],
+    visszautal: ah.data
+  };
+  drawEntForm();
+}
+const ALT_MEZOK = {
+  szemely: [['vezeteknev', 'Vezetéknév'], ['utonev', 'Utónév'], ['szuletesi_ev', 'Születési év', 'int'], ['halalozasi_ev', 'Halálozási év', 'int'], ['nem', 'Nem'], ['megjegyzes', 'Megjegyzés']],
+  testulet: [['testulet_tipus', 'Testület típusa', 'kod', 'testulet_tipus'], ['szekhely_id', 'Székhely', 'ent', ['hely']], ['alapitas_ev', 'Alapítás éve', 'int'], ['megszunes_ev', 'Megszűnés éve', 'int'], ['megjegyzes', 'Megjegyzés']],
+  hely: [['orszag_kod', 'Ország', 'kod', 'orszag_kod'], ['szelesseg', 'Szélesség (lat)', 'num'], ['hosszusag', 'Hosszúság (lon)', 'num'], ['megjegyzes', 'Megjegyzés']]
+};
+function drawEntForm() {
+  const c = $('#econtent'); const F = S.eform, e = F.e;
+  const scroll = c.scrollTop; c.innerHTML = '';
+  const page = h('div', { class: 'page' });
+  page.append(h('div', { class: 'sub' }, cimke('entitas_tipus', e.tipus) + ' · #' + e.id), h('h1', {}, e.nev));
+  page.append(h('div', { class: 'bar' }, h('button', { class: 'btn pri', onclick: mentEnt }, 'Mentés'),
+    h('button', { class: 'btn', onclick: () => megnyitEnt(e.id, true) }, 'Elvetés'),
+    h('button', { class: 'btn', onclick: () => wikidataKeres() }, 'Wikidata-keresés'),
+    h('span', { class: 'grow' }),
+    h('button', { class: 'btn', onclick: osszevonDialog }, 'Összevonás…'),
+    h('button', { class: 'btn', onclick: () => ujKerdes('szd_entitas', e.id) }, 'Kérdés'),
+    h('button', { class: 'btn danger', onclick: torolEnt }, 'Törlés')));
+  const set = (o, k) => ev => { o[k] = ev.target.value === '' ? null : ev.target.value; S.dirty = true; };
+  const alap = h('details', { class: 'blk', open: true }, h('summary', {}, 'ALAPADATOK'), h('div', { class: 'grid' },
+    fld('Típus', h('select', { onchange: ev => { e.tipus = ev.target.value; S.dirty = true; drawEntForm(); } }, ...opts('entitas_tipus', e.tipus, false)), 'A típus később is átállítható (pl. kulcsszóként felvett helynév → hely). A MARC-ban ettől függ, hogy 600/610/650/651 mezőbe kerül.'),
+    h('div', { class: 'f wide' }, h('label', {}, 'Név (besorolási alak)', h('span', { class: 'q', title: 'Személynél „Vezetéknév, Utónév”.' }, '?')), h('input', { type: 'text', value: e.nev, oninput: set(e, 'nev') })),
+    h('div', { class: 'f wide' }, h('label', {}, e.tipus === 'fogalom' ? 'Definíció / mit értünk alatta' : 'Leírás'), h('textarea', { oninput: set(e, 'leiras') }, e.leiras || '')),
+    h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: e.ellenorizve, onchange: ev => { e.ellenorizve = ev.target.checked; S.dirty = true; } }), 'ellenőrizve'),
+    h('div', { class: 'f wide' }, h('label', {}, 'Megjegyzés'), h('input', { type: 'text', value: e.megjegyzes || '', oninput: set(e, 'megjegyzes') }))));
+  page.append(alap);
+  if (ALT_MEZOK[e.tipus]) {
+    page.append(h('details', { class: 'blk', open: true }, h('summary', {}, cimke('entitas_tipus', e.tipus).toUpperCase() + ' – TÍPUSFÜGGŐ ADATOK'), h('div', { class: 'grid' },
+      ...ALT_MEZOK[e.tipus].map(([k, l, t, x]) => fld(l,
+        t === 'kod' ? h('select', { onchange: set(F.alt, k) }, ...opts(x, F.alt[k]))
+          : t === 'ent' ? entPicker({ value: F.alt[k], tipusok: x, onChange: id => { F.alt[k] = id; S.dirty = true; } })
+            : h('input', { type: t === 'int' || t === 'num' ? 'number' : 'text', step: t === 'num' ? 'any' : null, value: F.alt[k] ?? '', oninput: ev => { F.alt[k] = ev.target.value === '' ? null : (t === 'int' ? parseInt(ev.target.value, 10) : t === 'num' ? parseFloat(ev.target.value) : ev.target.value); S.dirty = true; } }))))));
+  }
+  // névváltozatok
+  const nvW = h('div', { class: 'rep' }, ...F.nv.map((n, i) => repSor('2fr 1fr 1fr', [fld('Névváltozat', txt(n, 'nev')), fld('Típus', sel(n, 'tipus', 'nevvaltozat_tipus')), fld('Nyelv', sel(n, 'nyelv', 'nyelv'))],
+    () => { F.nv.splice(i, 1); S.dirty = true; drawEntForm(); })), h('button', { class: 'btn sm', onclick: () => { F.nv.push({}); S.dirty = true; drawEntForm(); } }, '+ Névváltozat'));
+  page.append(h('details', { class: 'blk', open: true }, h('summary', {}, 'NÉVVÁLTOZATOK', h('span', { class: 'hint' }, '— álnevek, fedőnevek, eredeti írásmód, forrásbeli alakok; a keresés ezekre is talál')), nvW));
+  // azonosítók
+  const azW = h('div', { class: 'rep' }, ...F.az.map((a, i) => {
+    const sz = S.szotar.azonosito_rendszer?.[a.rendszer];
+    const link = sz?.leiras && a.ertek ? h('a', { href: sz.leiras.replace('{id}', a.ertek), target: '_blank', rel: 'noopener' }, 'megnyitás ↗') : null;
+    return repSor('1fr 1.2fr 2fr', [fld('Rendszer', sel(a, 'rendszer', 'azonosito_rendszer', false)), fld('Azonosító', txt(a, 'ertek', 'pl. Q12345')),
+      h('div', { class: 'f' }, h('label', {}, 'Címke az egyeztetéskor ', link), txt(a, 'cimke'))], () => { F.az.splice(i, 1); S.dirty = true; drawEntForm(); });
+  }), h('div', { class: 'bar', style: 'margin:0' }, h('button', { class: 'btn sm', onclick: () => { F.az.push({ rendszer: 'wikidata' }); S.dirty = true; drawEntForm(); } }, '+ Azonosító'),
+    h('button', { class: 'btn sm', onclick: () => wikidataKeres() }, 'Keresés a Wikidatán')));
+  page.append(h('details', { class: 'blk', open: true }, h('summary', {}, 'KÜLSŐ AZONOSÍTÓK', h('span', { class: 'hint' }, '— a MARC-exportban $1 (Wikidata, GeoNames, FactGrid) vagy $0 (VIAF, GND, ISNI) almező')), azW));
+  // állítások
+  const tul = S.tulajdonsag.filter(p => p.alany_tipusok.includes(e.tipus));
+  const alW = h('div', { class: 'rep' }, ...F.al.map((a, i) => {
+    const p = S.tulajdonsag.find(x => x.kod === a.tulajdonsag);
+    const ertek = !p ? h('span', { class: 'muted' }, 'válassz tulajdonságot') : p.ertek_tipus === 'entitas'
+      ? entPicker({ value: a.ertek_entitas_id, tipusok: p.cel_tipusok, onChange: id => { a.ertek_entitas_id = id; S.dirty = true; } })
+      : txt(a, 'ertek_szoveg');
+    return repSor('1.3fr 2fr 1fr', [
+      fld('Tulajdonság', h('select', { onchange: ev => { a.tulajdonsag = ev.target.value; a.ertek_entitas_id = null; a.ertek_szoveg = null; S.dirty = true; drawEntForm(); } },
+        h('option', { value: '' }, '—'), ...tul.map(x => h('option', { value: x.kod, selected: x.kod === a.tulajdonsag }, x.cimke + (x.wikidata_pid ? ` (${x.wikidata_pid})` : ''))))),
+      fld('Érték', ertek), fld('Időszak (EDTF)', h('input', { type: 'text', value: a.datum_edtf ?? '', placeholder: 'pl. 1981/1989', oninput: ev => { a.datum_edtf = ev.target.value || null; const pp = edtfParse(ev.target.value); a.datum_kezdet = pp?.k || null; a.datum_veg = pp?.v || null; S.dirty = true; } })),
+      fld('Bizonyosság', sel(a, 'bizonyossag', 'bizonyossag', false)), fld('Forrás típusa', sel(a, 'forras_tipus', 'forras_tipus')), fld('Forráshivatkozás', txt(a, 'forras_hivatkozas')),
+      h('div', { class: 'f', style: 'grid-column:1/-1' }, h('label', {}, 'Megjegyzés'), txt(a, 'megjegyzes'))
+    ], () => { F.al.splice(i, 1); S.dirty = true; drawEntForm(); });
+  }), h('button', { class: 'btn sm', onclick: () => { F.al.push({ bizonyossag: 'biztos' }); S.dirty = true; drawEntForm(); } }, '+ Állítás'));
+  page.append(h('details', { class: 'blk', open: true }, h('summary', {}, 'ÁLLÍTÁSOK', h('span', { class: 'hint' }, '— bővíthető adatok forrással; új tulajdonságtípust a Szótárak fülön lehet felvenni')), alW));
+  // hivatkozások
+  const hivW = h('div', { class: 'rep' });
+  if (!F.hiv.length && !F.visszautal.length) hivW.append(h('div', { class: 'muted' }, 'Egyetlen tétel sem hivatkozik rá.'));
+  const csop = new Map(); for (const [tid, sz] of F.hiv) { if (!csop.has(tid)) csop.set(tid, []); csop.get(tid).push(sz); }
+  for (const [tid, sz] of csop) { const t = S.tetel.get(tid); hivW.append(h('div', {}, h('a', { href: '#', onclick: ev => { ev.preventDefault(); go('tetelek', tid); } }, `${t?.sorszam} · ${tetelCimke(t)}`), h('span', { class: 'muted' }, ' — ' + [...new Set(sz)].join(', ')))); }
+  for (const v of F.visszautal) { const x = S.ent.get(v.entitas_id); hivW.append(h('div', {}, h('a', { href: '#', onclick: ev => { ev.preventDefault(); megnyitEnt(v.entitas_id); } }, x?.nev), h('span', { class: 'muted' }, ' — állítás: ' + (S.tulajdonsag.find(p => p.kod === v.tulajdonsag)?.cimke || v.tulajdonsag)))); }
+  page.append(h('details', { class: 'blk', open: true }, h('summary', {}, `HIVATKOZÁSOK (${csop.size} tétel)`), hivW));
+  if (e.id) page.append(h('p', { class: 'sub' }, `Létrehozta: ${e.letrehozta || '?'}` + (e.modositotta ? ` · Utoljára módosította: ${e.modositotta}, ${String(e.modositva).slice(0, 16).replace('T', ' ')}` : '')));
+  c.append(page); c.scrollTop = scroll;
+}
+async function mentEnt() {
+  const F = S.eform;
+  if (!F.e.nev?.trim()) return toast('A név kötelező.', true);
+  if (F.az.some(a => !a.ertek)) return toast('Van üres azonosítósor.', true);
+  if (F.al.some(a => !a.tulajdonsag || (!a.ertek_szoveg && !a.ertek_entitas_id))) return toast('Van hiányos állítássor (tulajdonság vagy érték hiányzik).', true);
+  const p = {
+    szd_entitas: tisztit(F.e, ['id', 'tipus', 'nev', 'leiras', 'ellenorizve', 'megjegyzes']),
+    szd_nevvaltozat: F.nv.filter(n => n.nev).map(n => tisztit(n, ['id', 'nev', 'tipus', 'nyelv', 'megjegyzes'])),
+    szd_azonosito: F.az.map(a => tisztit({ ...a, ertek: String(a.ertek).trim() }, ['id', 'rendszer', 'ertek', 'cimke', 'megjegyzes'])),
+    szd_allitas: F.al.map(a => tisztit(a, ['id', 'tulajdonsag', 'ertek_szoveg', 'ertek_entitas_id', 'datum_edtf', 'datum_kezdet', 'datum_veg', 'bizonyossag', 'forras_tipus', 'forras_hivatkozas', 'forras_tetel_id', 'megjegyzes']))
+  };
+  const altM = ALT_MEZOK[F.e.tipus];
+  if (altM) p.altipus = tisztit(F.alt, altM.map(m => m[0]));
+  const { error } = await sb.rpc('szd_entitas_ment', { p });
+  if (error) return toast('Mentési hiba: ' + (error.code === '23505' ? 'ez a külső azonosító már egy másik entitáshoz tartozik (' + error.message + ')' : hibaSzoveg(error)), true);
+  S.dirty = false; await loadEnt(); toast('Mentve: ' + F.e.nev); megnyitEnt(F.e.id, true);
+}
+async function torolEnt() {
+  const e = S.eform.e;
+  if (S.eform.hiv.length) return toast('Nem törölhető: tételek hivatkoznak rá. Ha duplikátum, használd az Összevonást.', true);
+  if (!(await confirmBox('Entitás törlése', `Biztosan törlöd: ${e.nev}?`, 'Törlöm'))) return;
+  const { error } = await sb.from('szd_entitas').delete().eq('id', e.id);
+  if (error) return toast(hibaSzoveg(error), true);
+  S.ent.delete(e.id); S.selEnt = null; S.dirty = false; toast('Törölve.'); render();
+}
+async function osszevonDialog() {
+  const e = S.eform.e; let masik = null;
+  const picker = entPicker({ value: null, tipusok: null, onChange: id => { masik = id; } });
+  const ok = await modal('Összevonás', h('div', {}, h('p', {}, `Melyik entitást vonjuk össze ezzel: „${e.nev}”? A kiválasztott entitás minden hivatkozása, névváltozata, azonosítója és állítása ide kerül, a neve névváltozat lesz, majd törlődik.`), picker),
+    [{ l: 'Mégse', v: false }, { l: 'Összevonás', v: true, pri: true }]);
+  if (!ok || !masik) return;
+  if (masik === e.id) return toast('Önmagával nem vonható össze.', true);
+  const { error } = await sb.rpc('szd_entitas_osszevon', { p_marad: e.id, p_megszunik: masik });
+  if (error) return toast(hibaSzoveg(error), true);
+  await loadEnt(); toast('Összevonva.'); megnyitEnt(e.id, true);
+}
+/* ---------- Wikidata ---------- */
+async function wd(params) {
+  const u = 'https://www.wikidata.org/w/api.php?' + new URLSearchParams({ format: 'json', origin: '*', ...params });
+  const r = await fetch(u); if (!r.ok) throw new Error('Wikidata: HTTP ' + r.status); return r.json();
+}
+async function wikidataKeres() {
+  const F = S.eform, e = F.e;
+  let q = e.nev; if (e.tipus === 'szemely' && q.includes(', ')) { const [a, b] = q.split(', '); q = b + ' ' + a; }
+  const inp = h('input', { type: 'text', value: q });
+  const res = h('div', { style: 'margin-top:10px' });
+  let valasztott = null, bezar = null;
+  const keres = async () => {
+    res.innerHTML = '<div class="muted">Keresés…</div>';
+    try {
+      const nyelvek = ['hu', 'pl', 'en', 'de'];
+      const all = await Promise.all(nyelvek.map(l => wd({ action: 'wbsearchentities', search: inp.value, language: l, uselang: 'hu', type: 'item', limit: 8 }).catch(() => ({ search: [] }))));
+      const m = new Map(); all.forEach(r => (r.search || []).forEach(x => { if (!m.has(x.id)) m.set(x.id, x); }));
+      res.innerHTML = '';
+      if (!m.size) { res.append(h('div', { class: 'muted' }, 'Nincs találat. Próbáld más írásmóddal (pl. ékezetek nélkül vagy eredeti nyelven).')); return; }
+      for (const x of m.values()) res.append(h('div', { class: 'wdres' }, h('div', { class: 'd' }, h('div', { class: 'l' }, x.label || x.id, ' ', h('a', { href: 'https://www.wikidata.org/wiki/' + x.id, target: '_blank', rel: 'noopener', class: 'mono' }, x.id)), h('div', { class: 's' }, x.description || '')),
+        h('button', { class: 'btn sm pri', onclick: () => { valasztott = x; bezar?.(); } }, 'Ez az')));
+    } catch (er) { res.innerHTML = ''; res.append(h('div', { class: 'warnbox' }, 'A Wikidata nem érhető el: ' + hibaSzoveg(er))); }
+  };
+  inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') keres(); });
+  const body = h('div', {}, h('div', { class: 'bar', style: 'margin:0' }, inp, h('button', { class: 'btn', onclick: keres }, 'Keresés')), res);
+  keres();
+  await modal('Wikidata-keresés', body, [{ l: 'Bezárás', v: false }], c => { bezar = () => c(true); });
+  if (!valasztott) return;
+  await wikidataAlkalmaz(valasztott);
+}
+async function wikidataAlkalmaz(x) {
+  const F = S.eform;
+  const meglevo = F.az.find(a => a.rendszer === 'wikidata');
+  if (meglevo) { meglevo.ertek = x.id; meglevo.cimke = x.label; } else F.az.push({ rendszer: 'wikidata', ertek: x.id, cimke: x.label });
+  S.dirty = true;
+  // további azonosítók és adatok a Wikidata-rekordból
+  try {
+    const r = await wd({ action: 'wbgetentities', ids: x.id, props: 'claims|labels', languages: 'hu|pl|en|de' });
+    const c = r.entities?.[x.id]?.claims || {};
+    const v = p => c[p]?.[0]?.mainsnak?.datavalue?.value;
+    const javas = [];
+    const idek = [['P214', 'viaf'], ['P227', 'gnd'], ['P213', 'isni'], ['P1566', 'geonames']];
+    for (const [pid, rsz] of idek) { const val = v(pid); if (val && !F.az.some(a => a.rendszer === rsz)) javas.push({ l: `${S.szotar.azonosito_rendszer?.[rsz]?.cimke || rsz}: ${val}`, f: () => F.az.push({ rendszer: rsz, ertek: String(val).replace(/\s/g, ''), cimke: 'Wikidatából (' + x.id + ')' }) }); }
+    const ev = p => { const t = v(p)?.time; return t ? parseInt(t.slice(1, 5), 10) : null; };
+    if (F.e.tipus === 'szemely') {
+      if (ev('P569') && !F.alt.szuletesi_ev) javas.push({ l: 'Születési év: ' + ev('P569'), f: () => { F.alt.szuletesi_ev = ev('P569'); } });
+      if (ev('P570') && !F.alt.halalozasi_ev) javas.push({ l: 'Halálozási év: ' + ev('P570'), f: () => { F.alt.halalozasi_ev = ev('P570'); } });
+    }
+    if (F.e.tipus === 'hely' && v('P625') && F.alt.szelesseg == null) { const g = v('P625'); javas.push({ l: `Koordináták: ${g.latitude.toFixed(4)}, ${g.longitude.toFixed(4)}`, f: () => { F.alt.szelesseg = +g.latitude.toFixed(6); F.alt.hosszusag = +g.longitude.toFixed(6); } }); }
+    const labels = r.entities?.[x.id]?.labels || {};
+    for (const [l, o] of Object.entries(labels)) { const nv = o.value; if (nv && nv !== F.e.nev && !F.nv.some(n => n.nev === nv) && !javas.some(j => j.nev === nv)) javas.push({ nev: nv, l: `Névváltozat (${l}): ${nv}`, f: () => F.nv.push({ nev: nv, tipus: 'eredeti', megjegyzes: 'Wikidatából' }) }); }
+    if (javas.length) {
+      const cbs = javas.map(j => h('input', { type: 'checkbox', checked: !j.nev }));
+      const ok = await modal('További adatok a Wikidatából', h('div', {}, h('p', { class: 'sub' }, `${x.label} (${x.id}) rekordjából ezeket lehet átvenni. Mentés előtt még átnézheted.`),
+        ...javas.map((j, i) => h('label', { class: 'chk', style: 'margin:4px 0' }, cbs[i], j.l))), [{ l: 'Kihagyom', v: false }, { l: 'Átveszem a kijelölteket', v: true, pri: true }]);
+      if (ok) javas.forEach((j, i) => cbs[i].checked && j.f());
+    }
+  } catch (er) { toast('A további Wikidata-adatok nem tölthetők be: ' + hibaSzoveg(er), true); }
+  drawEntForm();
+  toast('Wikidata-azonosító hozzárendelve – ne felejts el menteni.');
+}
+
+/* =====================================================================
+   ELLENŐRZENDŐ
+   ===================================================================== */
+async function viewEll(app) {
+  await loadEll();
+  const page = h('div', { class: 'page qlist', style: 'padding:16px' });
+  const nyitott = S.ellenorzendo.filter(q => q.allapot === 'nyitott'), lezart = S.ellenorzendo.filter(q => q.allapot !== 'nyitott');
+  page.append(h('h1', {}, 'Ellenőrzendő'), h('p', { class: 'sub' }, `${nyitott.length} nyitott, ${lezart.length} lezárt kérdés. Új kérdést a tétel vagy entitás oldalán a „Kérdés” gombbal lehet felvenni.`));
+  const kartya = q => {
+    const t = q.tabla === 'szd_tetel' ? S.tetel.get(q.rekord_id) : null, e = q.tabla === 'szd_entitas' && q.rekord_id ? S.ent.get(q.rekord_id) : null;
+    const hivatkozas = t ? h('a', { href: '#', onclick: ev => { ev.preventDefault(); go('tetelek', t.id); } }, `${t.sorszam} · ${tetelCimke(t)}`)
+      : e ? h('a', { href: '#', onclick: ev => { ev.preventDefault(); go('entitasok', e.id); } }, e.nev) : h('span', { class: 'muted' }, q.tabla === 'szd_entitas' ? 'entitások (általános)' : q.tabla.replace('szd_', ''));
+    const valasz = h('textarea', { style: 'min-height:50px;margin-top:6px', placeholder: 'Válasz / döntés…' }, q.valasz || '');
+    return h('div', { class: 'q' + (q.allapot !== 'nyitott' ? ' lezart' : '') }, h('div', { class: 'sub' }, hivatkozas, q.mezo ? ` · mező: ${q.mezo}` : '', ` · ${q.letrehozta || ''}`),
+      h('div', {}, q.kerdes), valasz, h('div', { class: 'bar', style: 'margin:6px 0 0' },
+        h('button', {
+          class: 'btn sm' + (q.allapot === 'nyitott' ? ' pri' : ''), onclick: async () => {
+            const { error } = await sb.from('szd_ellenorzendo').update({ allapot: q.allapot === 'nyitott' ? 'lezart' : 'nyitott', valasz: valasz.value || null }).eq('id', q.id);
+            if (error) return toast(hibaSzoveg(error), true); render();
+          }
+        }, q.allapot === 'nyitott' ? 'Lezárás' : 'Újranyitás'),
+        h('button', { class: 'btn sm', onclick: async () => { const { error } = await sb.from('szd_ellenorzendo').update({ valasz: valasz.value || null }).eq('id', q.id); error ? toast(hibaSzoveg(error), true) : toast('Válasz mentve.'); } }, 'Válasz mentése')));
+  };
+  nyitott.forEach(q => page.append(kartya(q)));
+  if (lezart.length) { page.append(h('h2', { style: 'margin:20px 0 8px' }, 'Lezárt')); lezart.forEach(q => page.append(kartya(q))); }
+  app.append(h('div', { class: 'content', style: 'height:100%' }, page));
+}
+
+/* =====================================================================
+   EXPORT
+   ===================================================================== */
+function letolt(nev, adat, tipus) {
+  const b = new Blob([adat], { type: tipus });
+  const a = h('a', { href: URL.createObjectURL(b), download: nev }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function viewExport(app) {
+  const page = h('div', { class: 'page', style: 'padding:16px' });
+  const per = [...S.tetel.values()].filter(t => t.biblio_szint === 's' || t.biblio_szint === 'm' || t.biblio_szint === 'c');
+  const kor = h('select', {}, h('option', { value: 'mind' }, 'Minden tétel (s, m, a szint)'), ...per.map(t => h('option', { value: t.id }, `Csak: ${t.sorszam} · ${t.cim} és részei`)), h('option', { value: 'lista' }, 'Megadott sorszámok'));
+  const lista = h('textarea', { class: 'hidden', placeholder: 'Sorszámok vesszővel vagy soronként: D1, D2, KS1' });
+  kor.addEventListener('change', () => lista.classList.toggle('hidden', kor.value !== 'lista'));
+  const csakEll = h('input', { type: 'checkbox' });
+  const elo = h('pre', { class: 'marc hidden' });
+  const kivalaszt = (db) => {
+    let ts = [...db.tetel.values()].filter(t => t.biblio_szint !== 'b');
+    if (kor.value === 'lista') { const s = new Set(lista.value.split(/[\s,;]+/).filter(Boolean)); ts = ts.filter(t => s.has(t.sorszam)); }
+    else if (kor.value !== 'mind') {
+      const gy = +kor.value; const ben = new Set([gy]); let valt = true;
+      while (valt) { valt = false; for (const t of db.tetel.values()) if (t.szulo_id && ben.has(t.szulo_id) && !ben.has(t.id)) { ben.add(t.id); valt = true; } }
+      ts = ts.filter(t => ben.has(t.id));
+    }
+    if (csakEll.checked) ts = ts.filter(t => t.ellenorizve);
+    return ts.sort((a, b) => ({ c: 0, s: 1, m: 2, a: 3 }[a.biblio_szint] - { c: 0, s: 1, m: 2, a: 3 }[b.biblio_szint]) || a.sorszam.localeCompare(b.sorszam, 'hu', { numeric: true }));
+  };
+  const futtat = async (forma) => {
+    try {
+      const db = await marcDb(); const ts = kivalaszt(db);
+      if (!ts.length) return toast('Nincs exportálható tétel.', true);
+      if (forma === 'csv') return letolt(`szamizdat_${new Date().toISOString().slice(0, 10)}.csv`, '﻿' + csvExport(db, ts), 'text/csv;charset=utf-8');
+      const recs = ts.map(t => MARC.rekord(db, t));
+      const nap = new Date().toISOString().slice(0, 10);
+      if (forma === 'xml') letolt(`szamizdat_marc_${nap}.xml`, MARC.xml(recs), 'application/marcxml+xml');
+      else if (forma === 'mrc') letolt(`szamizdat_marc_${nap}.mrc`, MARC.mrc(recs), 'application/marc');
+      else if (forma === 'mrk') letolt(`szamizdat_marc_${nap}.mrk`, MARC.mrk(recs), 'text/plain;charset=utf-8');
+      else { elo.textContent = MARC.mrk(recs.slice(0, 5)) + (recs.length > 5 ? `\n\n… (+${recs.length - 5} rekord)` : ''); elo.classList.remove('hidden'); return; }
+      toast(`${recs.length} rekord exportálva.`);
+    } catch (e) { toast('Exporthiba: ' + hibaSzoveg(e), true); }
+  };
+  page.append(h('h1', {}, 'Export'),
+    h('div', { class: 'card' }, h('div', { class: 'grid', style: 'padding:0' }, fld('Mit', kor), h('label', { class: 'chk', style: 'align-self:end' }, csakEll, 'csak az ellenőrzött tételek')), lista,
+      h('div', { class: 'bar' }, h('button', { class: 'btn', onclick: () => futtat('elo') }, 'Előnézet'), h('button', { class: 'btn pri', onclick: () => futtat('xml') }, 'MARCXML'),
+        h('button', { class: 'btn pri', onclick: () => futtat('mrc') }, 'MARC 21 (.mrc)'), h('button', { class: 'btn', onclick: () => futtat('mrk') }, 'MarcEdit-szöveg (.mrk)'),
+        h('button', { class: 'btn', onclick: () => futtat('csv') }, 'Lapos CSV (Excel)'))),
+    elo,
+    h('div', { class: 'card' }, h('h2', {}, 'Mi kerül a MARC-rekordba?'), h('table', { class: 't', style: 'margin-top:8px' }, h('tbody', {}, ...[
+      ['Leader/07', 'cikk periodikában → b; cikk kötetben → a; önálló kiadvány → m; periodika → s. A periodikaszám (b szint) nem önálló rekord: adatai a cikkek 773 $g mezőjébe kerülnek.'],
+      ['001, 005, 008', 'sorszám; utolsó módosítás; 008/06–14 a dátummodellből számolva (s/e/q/d/u/i/n), ország (pl. gb → xxk), nyelv'],
+      ['041', 'fordításnál: $a nyelv, $h eredeti nyelv'],
+      ['100/110, 700/710', 'közreműködők relátorkóddal ($e magyarul, $4 MARC-kód), $1 Wikidata-URI, $0 VIAF/GND/ISNI. A helyi szerepkódok csak $e-ben.'],
+      ['245, 264, 300', 'cím (2. indikátor: nem rendező karakterek), impresszum ahogy a kiadványon áll, terjedelem'],
+      ['336–338, 340, 365', 'RDA tartalom/média/hordozó, sokszorosítási technika ($d), ár'],
+      ['500, 506, 520', 'rovat, megállapított közreműködők, megjegyzés; hozzáférés; tartalmi kivonat'],
+      ['534, 787', 'átvétel: típus, forrás, útvonal, indoklás; ha a forrás is fel van véve, 787 kapcsolat'],
+      ['600/610/650/651/647, 655', 'említett személyek és kulcsszavak entitástípus szerint ($2 local, $1 URI), műfaj'],
+      ['773', 'gazdadokumentum: periodika/kötet címe, szám, oldal, $w a gazdarekord 001-ese'],
+      ['852, 856', 'példány: őrző intézmény, jelzet, állapot; digitális objektum'],
+      ['900, 901', 'helyi mezők: bizonyosság, adatforrás, hivatkozás, annotátor, ellenőrzöttség; üres mezők oka (nincs adat / nem vonatkozik)']
+    ].map(([a, b]) => h('tr', {}, h('th', { style: 'white-space:nowrap' }, a), h('td', {}, b)))))));
+  app.append(h('div', { class: 'content', style: 'height:100%' }, page));
+}
+function csvExport(db, ts) {
+  const nevek = (t, f) => db.koz.filter(k => k.tetel_id === t.id && f(k)).sort((a, b) => a.sorrend - b.sorrend).map(k => db.ent.get(k.entitas_id)?.nev).join('; ');
+  const targy = (t, tip) => db.targy.filter(x => x.tetel_id === t.id && x.tipus === tip).sort((a, b) => a.sorrend - b.sorrend).map(x => db.ent.get(x.entitas_id)?.nev + (x.emlitesek ? ' x' + x.emlitesek : '')).join('; ');
+  const fej = ['sorszam', 'biblio_szint', 'gazda', 'szam', 'cim', 'alcim', 'rovat', 'kiado', 'kiadas_helye', 'datum', 'datum_edtf', 'datum_kezdet', 'datum_veg', 'oldal', 'terjedelem', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'technika', 'ar', 'szerzo', 'fordito', 'szerkeszto', 'egyeb_kozremukodo', 'kiado_entitas', 'tartalmi_kivonat', 'kulcsszavak', 'emlitett_szemelyek', 'atvetel', 'orzo_jelzet', 'bizonyossag', 'forras_hivatkozas', 'hozzaferes', 'ellenorizve'];
+  const sor = t => {
+    const e = k => MARC.eff(db, t, k);
+    const sz = t.szulo_id ? db.tetel.get(t.szulo_id) : null; const g = sz?.biblio_szint === 'b' ? db.tetel.get(sz.szulo_id) : sz;
+    return [t.sorszam, t.biblio_szint, g?.cim, sz?.biblio_szint === 'b' ? sz.evfolyam_szam : '', t.cim, t.alcim, t.rovat, e('kiado_atirt'), e('kiadas_helye_atirt'), e('datum_atirt'), e('datum_edtf'), e('datum_kezdet'), e('datum_veg'), t.oldal_pozicio, t.terjedelem_oldal, t.nyelv, t.eredeti_nyelv, t.mufaj, e('tartalom_tipus'), e('sokszorositasi_technika'), e('ar'),
+      nevek(t, k => k.szerep === 'aut'), nevek(t, k => k.szerep === 'trl'), nevek(t, k => k.szerep === 'edt'), db.koz.filter(k => k.tetel_id === t.id && !['aut', 'trl', 'edt', 'pbl'].includes(k.szerep)).map(k => `${k.szerep}: ${db.ent.get(k.entitas_id)?.nev}`).join('; '),
+      nevek(t, k => k.szerep === 'pbl'), t.tartalmi_kivonat, targy(t, 'kulcsszo'), targy(t, 'emlitett'),
+      db.atv.filter(a => a.tetel_id === t.id).map(a => [a.atvetel_tipus, a.forras_leiras].filter(Boolean).join(': ')).join(' | '),
+      db.pld.filter(p => p.tetel_id === t.id).map(p => [db.ent.get(p.orzo_id)?.nev, p.jelzet].filter(Boolean).join(' ')).join(' | '),
+      t.bizonyossag, t.forras_hivatkozas, t.hozzaferes, t.ellenorizve ? 'igen' : 'nem'];
+  };
+  const q = v => { v = v == null ? '' : String(v); return /[";\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  return [fej, ...ts.map(sor)].map(r => r.map(q).join(';')).join('\r\n');
+}
+
+/* =====================================================================
+   SZÓTÁRAK + MUNKATÁRSAK
+   ===================================================================== */
+function viewSzotarak(app) {
+  const listak = [...new Set(S.szotarRows.map(r => r.lista))].sort();
+  S.szl ||= 'mufaj';
+  const side = h('div', { class: 'side' }, h('div', { class: 'tools' }, h('b', {}, 'Szótárlisták')), h('div', { class: 'list' },
+    ...listak.map(l => h('div', { class: 'row' + (S.szl === l ? ' sel' : ''), onclick: () => { S.szl = l; render(); } }, h('span', { class: 't' }, l), h('span', { class: 'tw' }, Object.keys(S.szotar[l] || {}).length))),
+    h('div', { class: 'row' + (S.szl === '__tul' ? ' sel' : ''), onclick: () => { S.szl = '__tul'; render(); } }, h('span', { class: 't' }, h('i', {}, 'tulajdonságok (állításokhoz)'))),
+    S.admin ? h('div', { class: 'row' + (S.szl === '__mt' ? ' sel' : ''), onclick: () => { S.szl = '__mt'; render(); } }, h('span', { class: 't' }, h('i', {}, 'munkatársak'))) : null));
+  const content = h('div', { class: 'content' }); const page = h('div', { class: 'page' }); content.append(page);
+  app.append(h('div', { class: 'split' }, side, content));
+  if (S.szl === '__mt') return munkatarsak(page);
+  if (S.szl === '__tul') return tulajdonsagok(page);
+  const l = S.szl, rows = Object.values(S.szotar[l] || {}).sort((a, b) => a.sorrend - b.sorrend);
+  const hasznal = S.kodmezo.filter(k => k.lista === l).map(k => `${k.tabla.replace('szd_', '')}.${k.oszlop}`);
+  page.append(h('h1', {}, l), h('p', { class: 'sub' }, hasznal.length ? 'Használja: ' + hasznal.join(', ') : ''),
+    h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...['Kód (tárolt érték)', 'Címke', 'MARC-kód', 'Leírás', 'Érvényes'].map(x => h('th', {}, x)))),
+      h('tbody', {}, ...rows.map(r => h('tr', {}, h('td', { class: 'mono' }, r.kod), h('td', {}, r.cimke), h('td', { class: 'mono' }, r.marc_kod || ''), h('td', { class: 'muted' }, r.leiras || ''),
+        h('td', {}, h('input', {
+          type: 'checkbox', checked: r.ervenyes, onchange: async e => {
+            const { error } = await sb.from('szd_szotar').update({ ervenyes: e.target.checked }).eq('lista', l).eq('kod', r.kod);
+            if (error) { toast(hibaSzoveg(error), true); e.target.checked = !e.target.checked; } else r.ervenyes = e.target.checked;
+          }
+        })))))));
+  const uj = { kod: '', cimke: '', marc_kod: '', leiras: '' };
+  page.append(h('div', { class: 'card', style: 'margin-top:12px' }, h('h2', {}, 'Új érték'), h('div', { class: 'grid', style: 'padding:8px 0 0' },
+    fld('Kód', txt(uj, 'kod'), 'Ez kerül az adatbázisba. Kódolt listáknál (nyelv, ország) a szabványos kód, egyébként maga a kifejezés.'), fld('Címke', txt(uj, 'cimke')), fld('MARC-kód', txt(uj, 'marc_kod')), fld('Leírás', txt(uj, 'leiras'))),
+    h('div', { class: 'bar' }, h('button', {
+      class: 'btn pri', onclick: async () => {
+        if (!uj.kod) return toast('A kód kötelező.', true);
+        const r = { lista: l, kod: uj.kod.trim(), cimke: (uj.cimke || uj.kod).trim(), marc_kod: uj.marc_kod || null, leiras: uj.leiras || null, sorrend: rows.length + 1 };
+        const { error } = await sb.from('szd_szotar').insert(r);
+        if (error) return toast(hibaSzoveg(error), true);
+        S.szotarRows.push({ ...r, ervenyes: true }); (S.szotar[l] ||= {})[r.kod] = { ...r, ervenyes: true }; toast('Felvéve.'); render();
+      }
+    }, 'Felvétel'))));
+  S.dirty = false;
+}
+function tulajdonsagok(page) {
+  page.append(h('h1', {}, 'Tulajdonságok'), h('p', { class: 'sub' }, 'Az entitásokhoz rögzíthető állítások típusai. Új adatfajta (pl. „letartóztatás”, „emigráció”, „álnév”) itt vehető fel – sémamódosítás nélkül.'),
+    h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...['Kód', 'Címke', 'Érték', 'Kinek', 'Cél', 'Wikidata'].map(x => h('th', {}, x)))),
+      h('tbody', {}, ...S.tulajdonsag.map(p => h('tr', {}, h('td', { class: 'mono' }, p.kod), h('td', {}, p.cimke), h('td', {}, p.ertek_tipus), h('td', {}, p.alany_tipusok.join(', ')), h('td', {}, (p.cel_tipusok || []).join(', ')), h('td', { class: 'mono' }, p.wikidata_pid || ''))))));
+  page.append(h('div', { class: 'note', style: 'margin-top:12px' }, 'Új tulajdonságot jelenleg az adminisztrátor vesz fel közvetlenül az adatbázisban (szd_tulajdonsag tábla), hogy a Wikidata-megfeleltetés egységes maradjon.'));
+}
+async function munkatarsak(page) {
+  const { data, error } = await sb.from('szd_munkatarsak').select('*').order('email');
+  if (error) return toast(hibaSzoveg(error), true);
+  page.append(h('h1', {}, 'Munkatársak'), h('p', { class: 'sub' }, 'Aki itt aktív, az feltölthet és szerkeszthet. A bejelentkezési fiókot (e-mail + jelszó) a Supabase-felületen, a Szamizdat projektben kell létrehozni (Authentication → Users → Add user → Auto Confirm User), majd itt felvenni a munkatársak közé.'),
+    h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...['E-mail', 'Név', 'Szerep', 'Aktív'].map(x => h('th', {}, x)))),
+      h('tbody', {}, ...data.map(m => h('tr', {}, h('td', {}, m.email), h('td', {}, m.nev || ''), h('td', {}, m.szerep),
+        h('td', {}, h('input', { type: 'checkbox', checked: m.aktiv, disabled: m.email === S.email, onchange: async e => { const { error } = await sb.from('szd_munkatarsak').update({ aktiv: e.target.checked }).eq('email', m.email); if (error) toast(hibaSzoveg(error), true); } })))))));
+  const uj = { email: '', nev: '', szerep: 'munkatars' };
+  page.append(h('div', { class: 'card', style: 'margin-top:12px' }, h('h2', {}, 'Új munkatárs'), h('div', { class: 'grid', style: 'padding:8px 0 0' },
+    fld('E-mail', txt(uj, 'email')), fld('Név', txt(uj, 'nev')), fld('Szerep', h('select', { onchange: e => uj.szerep = e.target.value }, h('option', { value: 'munkatars' }, 'munkatárs'), h('option', { value: 'admin' }, 'admin')))),
+    h('div', { class: 'bar' }, h('button', { class: 'btn pri', onclick: async () => { const { error } = await sb.from('szd_munkatarsak').insert({ email: uj.email.trim().toLowerCase(), nev: uj.nev || null, szerep: uj.szerep }); if (error) return toast(hibaSzoveg(error), true); toast('Felvéve.'); render(); } }, 'Felvétel'))));
+}
+
+/* =====================================================================
+   NAPLÓ
+   ===================================================================== */
+async function viewNaplo(app) {
+  const page = h('div', { class: 'page', style: 'padding:16px' });
+  app.append(h('div', { class: 'content', style: 'height:100%' }, page));
+  page.append(h('h1', {}, 'Változásnapló'), h('p', { class: 'sub' }, 'Az utolsó 300 módosítás. Minden mentés, törlés és összevonás a régi és az új értékkel együtt naplózódik.'));
+  const { data, error } = await sb.from('szd_naplo').select('*').order('id', { ascending: false }).limit(300);
+  if (error) return toast(hibaSzoveg(error), true);
+  const SKIP = new Set(['letrehozva', 'modositva', 'modositotta', 'letrehozta']);
+  page.append(h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...['Időpont', 'Felhasználó', 'Tábla', 'Művelet', 'Rekord', 'Változott'].map(x => h('th', {}, x)))),
+    h('tbody', {}, ...data.map(n => {
+      let valt = '';
+      if (n.muvelet === 'UPDATE') valt = Object.keys(n.uj || {}).filter(k => !SKIP.has(k) && JSON.stringify(n.uj[k]) !== JSON.stringify(n.regi?.[k])).map(k => `${k}: ${JSON.stringify(n.regi?.[k] ?? null).slice(0, 40)} → ${JSON.stringify(n.uj[k]).slice(0, 40)}`).join('\n');
+      else { const o = n.uj || n.regi || {}; valt = o.sorszam || o.nev || o.cim || o.kerdes || ''; }
+      const t = n.tabla === 'szd_tetel' ? S.tetel.get(n.rekord_id) : null;
+      return h('tr', {}, h('td', { class: 'mono' }, String(n.idopont).slice(0, 19).replace('T', ' ')), h('td', {}, n.felhasznalo), h('td', {}, n.tabla.replace('szd_', '')),
+        h('td', {}, { INSERT: 'új', UPDATE: 'módosítás', DELETE: 'törlés' }[n.muvelet] || n.muvelet),
+        h('td', {}, t ? h('a', { href: '#', onclick: e => { e.preventDefault(); go('tetelek', t.id); } }, t.sorszam) : (n.rekord_id ?? '')),
+        h('td', { class: 'diff', style: 'white-space:pre-wrap' }, valt));
+    }))));
+}
+
+/* =====================================================================
+   INDÍTÁS
+   ===================================================================== */
+function tema() {
+  let t = null; try { t = localStorage.getItem('szd_tema'); } catch (e) { }
+  if (t) document.documentElement.setAttribute('data-theme', t);
+  $('#themeBtn').onclick = () => {
+    const most = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const uj = most === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', uj); try { localStorage.setItem('szd_tema', uj); } catch (e) { }
+  };
+}
+window.addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (S.view === 'tetelek' && S.form) mentTetel(); else if (S.view === 'entitasok' && S.eform) mentEnt();
+  }
+});
+(async function init() {
+  tema();
+  if (!window.supabase) { $('#app').innerHTML = '<div class="card login"><h1>Nem tölthető be</h1><p>A Supabase-könyvtár nem érhető el (nincs internetkapcsolat?).</p></div>'; return; }
+  sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'szd-auth-' + new URL(CFG.url).hostname.split('.')[0] } });
+  $$('#nav button').forEach(b => b.addEventListener('click', () => go(b.dataset.v)));
+  $('#logoutBtn').onclick = async () => { if (S.dirty && !(await confirmBox('Kilépés', 'Nem mentett változások vannak. Kilépsz?', 'Kilépek'))) return; S.dirty = false; await sb.auth.signOut(); };
+  $('#pwBtn').onclick = async () => {
+    const p1 = h('input', { type: 'password', autocomplete: 'new-password' }), p2 = h('input', { type: 'password', autocomplete: 'new-password' });
+    if (!(await modal('Jelszó módosítása', h('div', {}, fld('Új jelszó', p1), fld('Még egyszer', p2)), [{ l: 'Mégse', v: false }, { l: 'Módosítás', v: true, pri: true }]))) return;
+    if (p1.value.length < 8 || p1.value !== p2.value) return toast('A két jelszó nem egyezik, vagy rövidebb 8 karakternél.', true);
+    const { error } = await sb.auth.updateUser({ password: p1.value }); error ? toast(hibaSzoveg(error), true) : toast('Jelszó módosítva.');
+  };
+  let elinditva = false;
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (session && !elinditva) { elinditva = true; setTimeout(() => startApp(session), 0); }
+    if (!session) { elinditva = false; S.form = null; S.eform = null; renderLogin(); }
+  });
+  const { data } = await sb.auth.getSession();
+  if (!data.session) renderLogin();
+})();
+</script>
+</body>
+</html>
