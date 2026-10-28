@@ -248,7 +248,7 @@ const MARC = (() => {
     }
     df('245', van1xx ? '1' : '0', String(t.cim_nemrendezo || 0), [['a', t.cim || (t.evfolyam_szam ? `[${t.evfolyam_szam}]` : null)], ['b', t.alcim], ['c', t.felelossegi_kozles]]);
     if (t.biblio_szint !== 'a') {
-      df('264', ' ', '1', [['a', t.kiadas_helye_atirt], ['b', t.kiado_atirt], ['c', t.datum_atirt]]);
+      df('264', ' ', '1', [['a', t.kiadas_helye_atirt], ['b', t.kiado_atirt], ['c', t.datum_atirt || t.datum_edtf]]);
     }
     if (t.terjedelem_oldal) df('300', ' ', ' ', [['a', `${t.terjedelem_oldal} oldal`]]);
     const ctype = { 'szöveg': [['text', 'txt']], 'állókép': [['still image', 'sti']], 'vegyes (szöveg + kép)': [['text', 'txt'], ['still image', 'sti']], 'kotta': [['notated music', 'ntm']] }[tt] || [];
@@ -297,9 +297,9 @@ const MARC = (() => {
     }
     if (t.biblio_szint === 'a' && szulo) {
       const iss = szulo.biblio_szint === 'b' ? szulo : null;
-      const g = [iss?.evfolyam_szam, iss?.datum_atirt && `(${iss.datum_atirt})`].filter(Boolean).join(' ');
+      const g = [iss?.evfolyam_szam, (iss?.datum_atirt || iss?.datum_edtf) && `(${iss.datum_atirt || iss.datum_edtf})`].filter(Boolean).join(' ');
       const gg = [g, t.oldal_pozicio && `${t.oldal_pozicio}. o.`].filter(Boolean).join(', ');
-      const hely = eff(db, szulo, 'kiadas_helye_atirt'), kiado = eff(db, szulo, 'kiado_atirt'), dd = eff(db, szulo, 'datum_atirt');
+      const hely = eff(db, szulo, 'kiadas_helye_atirt'), kiado = eff(db, szulo, 'kiado_atirt'), dd = eff(db, szulo, 'datum_atirt') || eff(db, szulo, 'datum_edtf');
       const d = [hely && kiado ? `${hely} : ${kiado}` : (hely || kiado), dd].filter(Boolean).join(', ');
       const gaut = db.koz.find(k => k.tetel_id === gazda?.id && k.szerep === 'aut');
       const ge = gaut ? db.ent.get(gaut.entitas_id) : null;
@@ -733,7 +733,7 @@ function viewTetelek(app) {
   };
   q.addEventListener('input', drawList); szf.addEventListener('change', drawList);
   const side = h('div', { class: 'side' }, h('div', { class: 'tools' }, q, szf,
-    h('div', { class: 'bar', style: 'margin:0' }, h('button', { class: 'btn pri', onclick: () => ujTetel() }, '+ Új tétel'),
+    h('div', { class: 'bar', style: 'margin:0' }, h('button', { class: 'btn pri', onclick: () => ujTetelValaszto() }, '+ Új tétel'),
       h('span', { class: 'muted', style: 'font-size:12px' }, `${S.tetel.size} tétel`))), list);
   const content = h('div', { class: 'content', id: 'tcontent' });
   app.append(h('div', { class: 'split' }, side, content));
@@ -774,7 +774,15 @@ async function megnyitTetel(id, force = false) {
   S.drawList?.();
   drawTetelForm();
 }
-function kovSorszam(szuloId) {
+function kovSorszam(szuloId, szint = 'a') {
+  const all = new Set([...S.tetel.values()].map(t => t.sorszam));
+  if (!szuloId) {  // önálló kiadvány / periodika: azonos szintű tételek mintája alapján
+    const minta = [...S.tetel.values()].filter(t => t.biblio_szint === szint && /\d+$/.test(t.sorszam)).map(t => t.sorszam).sort((a, b) => a.localeCompare(b, 'hu', { numeric: true })).pop();
+    const m = minta?.match(/^(.*?)(\d+)$/); let n = m ? +m[2] + 1 : 1, cand;
+    do { cand = (m ? m[1] : szint.toUpperCase()) + n++; } while (all.has(cand));
+    return cand;
+  }
+  if (szint === 'b') { const p = S.tetel.get(szuloId); let n = 1, cand; do { cand = `${p?.sorszam || 'P'}-${n++}`; } while (all.has(cand)); return cand; }
   const testverek = [...S.tetel.values()].filter(t => t.szulo_id === szuloId);
   let minta = testverek.map(t => t.sorszam).sort((a, b) => a.localeCompare(b, 'hu', { numeric: true })).pop();
   if (!minta) {  // a periodika többi számának cikkei alapján
@@ -786,7 +794,6 @@ function kovSorszam(szuloId) {
   const m = minta.match(/^(.*?)(\d+)$/);
   if (!m) return minta + '-2';
   let n = +m[2] + 1, cand;
-  const all = new Set([...S.tetel.values()].map(t => t.sorszam));
   do { cand = m[1] + n++; } while (all.has(cand));
   return cand;
 }
@@ -794,8 +801,8 @@ async function ujTetel(alap = {}) {
   if (S.dirty && !(await confirmBox('Nem mentett változások', 'Eldobod a nem mentett módosításokat?', 'Eldobom'))) return;
   const osok = []; let pid = alap.szulo_id;
   while (pid && osok.length < 3) { const { data } = await sb.from('szd_tetel').select('*').eq('id', pid).single(); if (!data) break; osok.push(data); pid = data.szulo_id; }
-  S.selTetel = null; S.dirty = true;
-  S.form = { t: { biblio_szint: 'a', ures_mezok: {}, ellenorizve: false, felvitel_datuma: new Date().toISOString().slice(0, 10), ...alap }, koz: alap._koz || [], targy: [], atv: [], pld: alap._pld || [], dig: [], osok };
+  S.selTetel = null; S.dirty = false;
+  S.form = { t: { biblio_szint: 'a', ...UJ_ALAP(), ...alap }, koz: alap._koz || [], targy: [], atv: [], pld: alap._pld || (S.utolsoPld ? S.utolsoPld.map(p => ({ ...p })) : []), dig: [], osok };
   delete S.form.t._koz; delete S.form.t._pld;
   S.drawList?.(); drawTetelForm();
   setTimeout(() => $('#tcontent input[data-k="cim"]')?.focus(), 50);
@@ -804,7 +811,7 @@ function orokolt(k) {
   for (const o of S.form.osok || []) if (o[k] !== null && o[k] !== undefined && o[k] !== '') return [o[k], o];
   return null;
 }
-function mezoElem(m, t) {
+function mezoElem(m, t, gyors = false) {
   const v = t[m.k];
   const set = val => {
     t[m.k] = val === '' ? null : val;
@@ -842,7 +849,7 @@ function mezoElem(m, t) {
     default: inp = h('input', { type: 'text', 'data-k': m.k, value: v ?? '', oninput: e => set(e.target.value) });
   }
   const lab = h('label', {}, m.l, m.req ? h('span', { class: 'req' }, '*') : null, m.help ? h('span', { class: 'q', title: m.help }, '?') : null);
-  if (URES_OK.has(m.k) && (v === null || v === undefined || v === '')) {
+  if (!gyors && URES_OK.has(m.k) && (v === null || v === undefined || v === '')) {
     const u = t.ures_mezok?.[m.k];
     lab.append(h('span', { class: 'ures' },
       ...[['na', 'n.a.', 'nincs adat'], ['nv', 'n.v.', 'nem vonatkozik']].map(([k, l, tt]) => h('button', {
@@ -852,7 +859,7 @@ function mezoElem(m, t) {
       }, l))));
   }
   const f = h('div', { class: 'f' + (m.wide || m.t === 'textarea' ? ' wide' : '') }, lab, inp);
-  if (ORKOL.has(m.k) && (v === null || v === undefined || v === '') && ['a', 'b'].includes(t.biblio_szint)) {
+  if (!gyors && ORKOL.has(m.k) && (v === null || v === undefined || v === '') && ['a', 'b'].includes(t.biblio_szint)) {
     const o = orokolt(m.k);
     if (o) f.append(h('span', { class: 'inh' }, '↳ örökölt: ' + (m.t === 'kod' ? cimke(m.lista, o[0]) : m.t === 'ent' ? (S.ent.get(o[0])?.nev || o[0]) : o[0]) + ` (${o[1].sorszam})`));
   }
@@ -889,6 +896,99 @@ function edtfParse(s) {
   const tipus = bizonytalan ? 'becsult' : /^\d{4}-\d{2}-\d{2}$/.test(s) ? 'pontos' : /^\d{4}-\d{2}$/.test(s) ? 'honap' : 'ev';
   return { k, v, tipus };
 }
+/* ---------- egyszerűsített felvitel: rövid űrlap + Részletek ---------- */
+const SZINT_NEV = { a: 'Cikk, kép vagy rövidhír', b: 'Periodikaszám', m: 'Önálló kiadvány', s: 'Periodika', c: 'Gyűjtemény / sorozat' };
+const GYORS = {
+  a: ['szulo_id', 'cim', 'alcim', 'mufaj', 'nyelv', 'eredeti_nyelv', 'oldal_pozicio', 'rovat'],
+  m: ['cim', 'alcim', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'kiadvany_tipus', 'sokszorositasi_technika'],
+  b: ['szulo_id', 'evfolyam_szam', 'datum_edtf', 'ar', 'sokszorositasi_technika'],
+  s: ['cim', 'alcim', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf'],
+  c: ['cim', 'datum_edtf']
+};
+const GYORS_CIMKE = {
+  cim: 'Cím', alcim: 'Alcím', mufaj: 'Műfaj', nyelv: 'Nyelv', eredeti_nyelv: 'Eredeti nyelv (ha fordítás)', oldal_pozicio: 'Oldal', rovat: 'Rovat',
+  kiado_atirt: 'Kiadó', kiadas_helye_atirt: 'Kiadás helye', datum_edtf: 'Megjelenés ideje', terjedelem_oldal: 'Oldalszám', kiadvany_tipus: 'Kiadvány típusa',
+  sokszorositasi_technika: 'Sokszorosítás', evfolyam_szam: 'Évfolyam, szám', ar: 'Ár'
+};
+const UJ_ALAP = () => ({ ures_mezok: {}, ellenorizve: false, felvitel_datuma: new Date().toISOString().slice(0, 10), bizonyossag: 'biztos', adat_forrasa: 'maga a kiadvány', tartalom_tipus: 'szöveg', rda_media: 'unmediated', rda_hordozo: 'volume', ...(S.utolso || {}) });
+function mezoSpec(k) { for (const b of TBLOKK) for (const m of b.mezok || []) if (m.k === k) return m; return { k }; }
+function datumOlvasva(t) {
+  const p = edtfParse(t.datum_edtf);
+  if (!t.datum_edtf) return '';
+  if (!p) return 'nem értelmezhető – pl. 1986, 1986-04, 1986-01/1986-02, 1981?';
+  const f = d => d ? d.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1. $2. $3.') : '…';
+  return `${f(p.k)} – ${f(p.v)} · ${cimke('datum_tipus', p.tipus)}`;
+}
+function gyorsMezo(k, t) {
+  const m = { ...mezoSpec(k), l: k === 'szulo_id' ? (t.biblio_szint === 'b' ? 'Melyik periodika száma?' : 'Hol jelent meg? (szám vagy kötet)') : (GYORS_CIMKE[k] || mezoSpec(k).l), req: ['cim', 'szulo_id'].includes(k) && !(k === 'cim' && t.biblio_szint === 'b'), wide: ['szulo_id', 'cim'].includes(k) };
+  if (k === 'szulo_id') {
+    const lehet = SZULO_SZINT[t.biblio_szint] || [];
+    const csop = lehet.map(sz => {
+      const elemek = [...S.tetel.values()].filter(x => x.biblio_szint === sz && x.id !== t.id)
+        .sort((a, b) => tetelCimke(a).localeCompare(tetelCimke(b), 'hu', { numeric: true }));
+      return elemek.length ? h('optgroup', { label: { b: 'Periodikaszámok', m: 'Önálló kiadványok', s: 'Periodikák', c: 'Gyűjtemények' }[sz] },
+        ...elemek.map(x => h('option', { value: x.id, selected: x.id === t.szulo_id }, `${tetelCimke(x)}  (${x.sorszam})`))) : null;
+    });
+    const s = h('select', {
+      onchange: async e => {
+        t.szulo_id = e.target.value ? +e.target.value : null; S.dirty = true;
+        if (!t.id && (!t.sorszam || t._autoSorszam)) { t.sorszam = kovSorszam(t.szulo_id, t.biblio_szint); t._autoSorszam = true; }
+        await frissitOsok(); drawTetelForm();
+      }
+    }, h('option', { value: '' }, '— válassz —'), ...csop);
+    return h('div', { class: 'f wide' }, h('label', {}, m.l, h('span', { class: 'req' }, '*')), s);
+  }
+  if (k === 'datum_edtf') {
+    const olv = h('span', { class: 'inh' }, datumOlvasva(t));
+    const inp = h('input', {
+      type: 'text', value: t.datum_edtf ?? '', placeholder: 'pl. 1986 · 1986-04 · 1986-01/1986-02 · 198X', oninput: e => {
+        t.datum_edtf = e.target.value.trim() || null; S.dirty = true;
+        const p = edtfParse(t.datum_edtf);
+        if (p) { t.datum_kezdet = p.k; t.datum_veg = p.v; t.datum_tipus = p.tipus; }
+        olv.textContent = datumOlvasva(t);
+      }
+    });
+    return h('div', { class: 'f' }, h('label', {}, m.l, h('span', { class: 'q', title: 'Évszám, hónap (1986-04), időköz (1986-01/1986-02), bizonytalan év (1981?), évtized (198X). A legkorábbi és legkésőbbi napot magától kiszámolja; a kiadványon álló alakot a Részleteknél lehet megadni.' }, '?')), inp, olv);
+  }
+  return mezoElem(m, t, true);
+}
+function gyorsKoz(F) {
+  const wrap = h('div', { class: 'rep', style: 'padding:0' });
+  F.koz.forEach((k, i) => {
+    const sor = h('div', { class: 'reprow', style: 'grid-template-columns:2fr 1.2fr auto auto auto auto;align-items:center' },
+      entPicker({ value: k.entitas_id, tipusok: ['szemely', 'testulet'], placeholder: 'Név keresése vagy új…', onChange: id => { k.entitas_id = id; S.dirty = true; } }),
+      h('select', { onchange: e => { k.szerep = e.target.value; S.dirty = true; } }, ...Object.values(S.szotar.szerep || {}).filter(r => r.ervenyes || r.kod === k.szerep).sort((a, b) => a.sorrend - b.sorrend).map(r => h('option', { value: r.kod, selected: r.kod === k.szerep }, r.cimke))),
+      h('label', { class: 'chk', title: 'A közreműködés nem biztos (feltételezett)' }, h('input', { type: 'checkbox', checked: k.bizonyossag && k.bizonyossag !== 'biztos', onchange: e => { k.bizonyossag = e.target.checked ? 'feltételezett' : 'biztos'; S.dirty = true; } }), 'bizonytalan'),
+      h('label', { class: 'chk', title: 'A név nem szerepel a kiadványon, külső forrásból tudjuk' }, h('input', { type: 'checkbox', checked: !!k.kikovetkeztetett, onchange: e => { k.kikovetkeztetett = e.target.checked; S.dirty = true; } }), 'nincs a kiadványon'),
+      h('button', { class: 'btn sm ghost', title: 'Név a forrásban, sorrend, megjegyzés', onclick: () => { k._nyit = !k._nyit; drawTetelForm(); } }, k._nyit ? '▴' : '…'),
+      h('button', { class: 'btn sm ghost', title: 'Sor törlése', onclick: () => { F.koz.splice(i, 1); S.dirty = true; drawTetelForm(); } }, '✕'));
+    if (k._nyit) sor.append(h('div', { class: 'grid', style: 'grid-column:1/-1;padding:4px 0 0' },
+      fld('Név a forrásban', txt(k, 'nev_a_forrasban', 'ahogy a kiadványon áll')),
+      fld('Sorrend', h('input', { type: 'number', value: k.sorrend ?? 1, oninput: e => { k.sorrend = +e.target.value || 1; S.dirty = true; } })),
+      fld('Megjegyzés', txt(k, 'megjegyzes'))));
+    wrap.append(sor);
+  });
+  const uj = szerep => { F.koz.push({ szerep, sorrend: F.koz.filter(x => x.szerep === szerep).length + 1, bizonyossag: 'biztos', kikovetkeztetett: false }); S.dirty = true; drawTetelForm(); setTimeout(() => $$('#tcontent .reprow .ep input').pop()?.focus(), 30); };
+  wrap.append(h('div', { class: 'bar', style: 'margin:4px 0 0' }, h('button', { class: 'btn sm', onclick: () => uj('aut') }, '+ Szerző'), h('button', { class: 'btn sm', onclick: () => uj('trl') }, '+ Fordító'),
+    h('button', { class: 'btn sm', onclick: () => uj('edt') }, '+ Szerkesztő'), h('button', { class: 'btn sm', onclick: () => uj('ctb') }, '+ Más szerep'),
+    ['b', 's', 'm'].includes(F.t.biblio_szint) ? h('button', { class: 'btn sm', onclick: () => uj('pbl') }, '+ Kiadó (szervezetként)') : null));
+  return wrap;
+}
+function chipSor(F, tipus, tipusok, ph) {
+  const lista = F.targy.filter(x => x.tipus === tipus).sort((a, b) => (a.sorrend || 0) - (b.sorrend || 0));
+  return h('div', {},
+    h('div', { class: 'chips', style: 'padding:0 0 6px' }, ...lista.map(x => {
+      const e = S.ent.get(x.entitas_id);
+      return h('span', { class: 'chip' }, e?.nev || '?', x.emlitesek ? h('span', { class: 'muted' }, ` ×${x.emlitesek}`) : null,
+        h('button', { title: 'Eltávolítás', onclick: () => { F.targy.splice(F.targy.indexOf(x), 1); S.dirty = true; drawTetelForm(); } }, '×'));
+    })),
+    h('div', { style: 'max-width:420px' }, entPicker({
+      value: null, tipusok, placeholder: ph, onChange: id => {
+        if (id && !F.targy.some(x => x.tipus === tipus && x.entitas_id === id)) F.targy.push({ entitas_id: id, tipus, sorrend: lista.length + 1 });
+        S.dirty = true; drawTetelForm(); setTimeout(() => $(`#tcontent [data-chip="${tipus}"] input`)?.focus(), 30);
+      }
+    })));
+}
 function drawTetelForm() {
   const c = $('#tcontent'); if (!c) return;
   const F = S.form, t = F.t;
@@ -897,31 +997,85 @@ function drawTetelForm() {
   const page = h('div', { class: 'page' });
   const szulo = S.tetel.get(t.szulo_id);
   const nyitottKerdes = S.ellenorzendo.filter(q => q.tabla === 'szd_tetel' && q.rekord_id === t.id && q.allapot === 'nyitott');
-  page.append(h('div', { class: 'sub' }, t.id ? `${cimke('biblio_szint', t.biblio_szint)} · ${t.sorszam}` : 'Új tétel', szulo ? ' · ' : '', szulo ? h('a', { href: '#', onclick: e => { e.preventDefault(); megnyitTetel(szulo.id); } }, tetelCimke(szulo)) : null),
-    h('h1', {}, t.biblio_szint === 'b' ? (t.evfolyam_szam || 'Periodikaszám') : (t.cim || 'Cím nélkül')));
-  const bar = h('div', { class: 'bar' },
-    h('button', { class: 'btn pri', onclick: mentTetel }, 'Mentés'),
+  page.append(h('div', { class: 'sub' }, (t.id ? '' : 'Új · ') + (SZINT_NEV[t.biblio_szint] || ''), szulo ? ' · ' : '', szulo ? h('a', { href: '#', onclick: e => { e.preventDefault(); megnyitTetel(szulo.id); } }, tetelCimke(szulo)) : null),
+    h('h1', {}, t.biblio_szint === 'b' ? (t.evfolyam_szam || 'Új periodikaszám') : (t.cim || (t.id ? 'Cím nélkül' : 'Új tétel'))));
+  const kov = ['a', 'b'].includes(t.biblio_szint);
+  page.append(h('div', { class: 'bar' },
+    h('button', { class: 'btn pri', onclick: () => mentTetel(), title: 'Ctrl+S' }, 'Mentés'),
+    kov ? h('button', { class: 'btn pri', onclick: () => mentTetel(true), title: 'Mentés, majd új tétel ugyanoda' }, t.biblio_szint === 'a' ? 'Mentés és következő cikk' : 'Mentés és következő szám') : null,
     t.id ? h('button', { class: 'btn', onclick: () => megnyitTetel(t.id, true) }, 'Elvetés') : null,
-    t.id ? h('button', { class: 'btn', title: 'Új tétel ugyanazzal a szülővel, közreműködőkkel és példánnyal', onclick: masolTetel }, 'Másolat új tételként') : null,
-    t.id && (t.biblio_szint === 'b' || t.biblio_szint === 'm') ? h('button', { class: 'btn', onclick: () => ujTetel({ szulo_id: t.id, biblio_szint: 'a', sorszam: kovSorszam(t.id) }) }, '+ Cikk ebbe') : null,
-    t.id && t.biblio_szint === 's' ? h('button', { class: 'btn', onclick: () => ujTetel({ szulo_id: t.id, biblio_szint: 'b', sorszam: (t.sorszam || '') + '-' }) }, '+ Új szám') : null,
     h('span', { class: 'grow' }),
-    t.id ? h('button', { class: 'btn', onclick: () => marcElonezet(t.id) }, 'MARC') : null,
-    t.id ? h('button', { class: 'btn', onclick: () => ujKerdes('szd_tetel', t.id) }, 'Kérdés' + (nyitottKerdes.length ? ` (${nyitottKerdes.length})` : '')) : null,
-    t.id ? h('button', { class: 'btn danger', onclick: torolTetel }, 'Törlés') : null);
-  page.append(bar);
+    t.id && (t.biblio_szint === 'b' || t.biblio_szint === 'm') ? h('button', { class: 'btn sm', onclick: () => ujTetel({ ...ujCikkAlap(t.id) }) }, '+ Cikk ebbe') : null,
+    t.id && t.biblio_szint === 's' ? h('button', { class: 'btn sm', onclick: () => ujTetel({ szulo_id: t.id, biblio_szint: 'b', sorszam: kovSorszam(t.id, 'b'), _autoSorszam: true }) }, '+ Új szám') : null,
+    t.id ? h('button', { class: 'btn sm', onclick: () => marcElonezet(t.id) }, 'MARC') : null,
+    t.id ? h('button', { class: 'btn sm', onclick: () => ujKerdes('szd_tetel', t.id) }, 'Kérdés' + (nyitottKerdes.length ? ` (${nyitottKerdes.length})` : '')) : null,
+    t.id ? h('button', { class: 'btn sm danger', onclick: torolTetel }, 'Törlés') : null));
   if (nyitottKerdes.length) page.append(h('div', { class: 'warnbox', style: 'margin-bottom:10px' }, h('b', {}, 'Ellenőrzendő: '), nyitottKerdes.map(q => q.kerdes).join(' · ')));
-  for (const b of TBLOKK) {
-    const nyit = S.zartBlokk?.has(b.id) ? false : true;
-    const d = h('details', { class: 'blk', open: nyit, ontoggle: e => { S.zartBlokk ||= new Set(); e.target.open ? S.zartBlokk.delete(b.id) : S.zartBlokk.add(b.id); } },
-      h('summary', {}, b.cim, b.hint ? h('span', { class: 'hint' }, '— ' + b.hint) : null));
-    if (b.mezok) d.append(h('div', { class: 'grid' }, ...b.mezok.filter(m => !m.csak || m.csak.includes(t.biblio_szint)).map(m => mezoElem(m, t))));
-    else d.append(...{ koz: blokkKoz, targy: blokkTargy, atv: blokkAtv, pld: blokkPld, dig: blokkDig }[b.t](F));
-    page.append(d);
+
+  // --- rövid űrlap ---
+  const gy = h('div', { class: 'card', style: 'padding:14px 16px' });
+  const fej = h('div', { class: 'bar', style: 'margin:0 0 8px' },
+    h('label', { class: 'muted', style: 'font-size:12px' }, 'Típus '), h('select', { style: 'width:auto', onchange: async e => { t.biblio_szint = e.target.value; if (!(SZULO_SZINT[t.biblio_szint] || []).includes(S.tetel.get(t.szulo_id)?.biblio_szint)) t.szulo_id = null; S.dirty = true; await frissitOsok(); drawTetelForm(); } },
+      ...['a', 'm', 'b', 's', 'c'].map(k => h('option', { value: k, selected: t.biblio_szint === k }, SZINT_NEV[k]))),
+    h('span', { class: 'grow' }),
+    h('label', { class: 'muted', style: 'font-size:12px' }, 'Sorszám ', h('span', { class: 'q', title: 'Egyedi azonosító; újnál magától kitölti a következő szabad számmal.' }, '?')),
+    h('input', { type: 'text', value: t.sorszam ?? '', style: 'width:130px', oninput: e => { t.sorszam = e.target.value; t._autoSorszam = false; S.dirty = true; } }));
+  gy.append(fej, h('div', { class: 'grid', style: 'padding:0' }, ...(GYORS[t.biblio_szint] || []).map(k => gyorsMezo(k, t))));
+  gy.append(h('h2', { style: 'margin:14px 0 6px;font-size:13px;color:var(--muted)' }, 'Szerző, fordító, szerkesztő'), gyorsKoz(F));
+  if (['a', 'm'].includes(t.biblio_szint)) {
+    gy.append(h('div', { class: 'grid', style: 'padding:12px 0 0' },
+      h('div', { class: 'f wide', 'data-chip': 'kulcsszo' }, h('label', {}, 'Kulcsszavak, helyek, szervezetek'), chipSor(F, 'kulcsszo', ['fogalom', 'hely', 'testulet', 'esemeny'], '+ kulcsszó…')),
+      h('div', { class: 'f wide', 'data-chip': 'emlitett' }, h('label', {}, 'Említett személyek (akiről szól)'), chipSor(F, 'emlitett', ['szemely'], '+ személy…')),
+      mezoElem({ k: 'tartalmi_kivonat', l: 'Tartalmi kivonat', t: 'textarea', wide: 1, help: '2–3 mondat: miről szól, mi az állítása, milyen eseményre vonatkozik.' }, t, true)));
   }
+  page.append(gy);
+
+  // --- részletek ---
+  const gyorsK = new Set([...(GYORS[t.biblio_szint] || []), 'sorszam', 'biblio_szint', 'szulo_id', 'tartalmi_kivonat']);
+  const resz = h('details', { class: 'blk', open: !!S.reszletNyitva, ontoggle: e => { S.reszletNyitva = e.target.open; } },
+    h('summary', {}, 'RÉSZLETEK', h('span', { class: 'hint' }, '— átvétel, példány, digitális változat, dátum a kiadványon, RDA, apparátus, üres mezők oka; cikknél a szám adatai öröklődnek')));
+  const belso = h('div', { style: 'padding:0 10px 10px' });
+  for (const b of TBLOKK) {
+    if (b.t === 'koz' || b.t === 'targy') continue;
+    let tart;
+    if (b.mezok) {
+      const mz = b.mezok.filter(m => (!m.csak || m.csak.includes(t.biblio_szint)) && !gyorsK.has(m.k));
+      if (!mz.length) continue;
+      tart = [h('div', { class: 'grid' }, ...mz.map(m => mezoElem(m, t)))];
+    } else tart = { atv: blokkAtv, pld: blokkPld, dig: blokkDig }[b.t](F);
+    belso.append(h('details', { class: 'blk', open: true, style: 'box-shadow:none' }, h('summary', {}, b.cim, b.hint ? h('span', { class: 'hint' }, '— ' + b.hint) : null), ...tart));
+  }
+  const eml = F.targy.filter(x => x.tipus === 'emlitett');
+  if (eml.length) belso.append(h('details', { class: 'blk', open: true, style: 'box-shadow:none' }, h('summary', {}, 'EMLÍTÉSEK SZÁMA'),
+    h('div', { class: 'grid' }, ...eml.map(x => fld(S.ent.get(x.entitas_id)?.nev || '?', h('input', { type: 'number', min: 1, value: x.emlitesek ?? '', oninput: e => { x.emlitesek = e.target.value ? +e.target.value : null; S.dirty = true; } }))))));
+  resz.append(belso);
+  page.append(resz);
   if (t.id) page.append(h('p', { class: 'sub' }, `Létrehozta: ${t.letrehozta || '?'}, ${String(t.letrehozva || '').slice(0, 16).replace('T', ' ')}` + (t.modositotta ? ` · Utoljára módosította: ${t.modositotta}, ${String(t.modositva).slice(0, 16).replace('T', ' ')}` : '')));
   c.append(page);
   c.scrollTop = scroll;
+}
+function ujCikkAlap(szuloId) {
+  return { szulo_id: szuloId, biblio_szint: 'a', sorszam: kovSorszam(szuloId, 'a'), _autoSorszam: true };
+}
+async function ujTetelValaszto() {
+  const akt = S.tetel.get(S.selTetel) || (S.form?.t?.szulo_id ? { biblio_szint: 'a', szulo_id: S.form.t.szulo_id } : null);
+  const cel = akt && ['b', 'm'].includes(akt.biblio_szint) ? akt : (akt?.biblio_szint === 'a' ? S.tetel.get(akt.szulo_id) : null);
+  const opciok = [
+    cel ? { v: 'ide', l: `Cikk, kép vagy rövidhír ebbe: ${tetelCimke(cel)}`, d: 'A leggyakoribb eset.' } : null,
+    { v: 'a', l: 'Cikk, kép vagy rövidhír', d: 'Egy periodikaszámban vagy önálló kiadványban megjelent tétel.' },
+    { v: 'm', l: 'Önálló kiadvány', d: 'Könyv, brosúra, röplap.' },
+    { v: 'b', l: 'Új periodikaszám', d: 'Egy már felvett periodika újabb száma.' },
+    { v: 's', l: 'Új periodika', d: 'Lap, folyóirat egésze (pl. Demokrata).' }
+  ].filter(Boolean);
+  let valasz = null;
+  const body = h('div', {}, ...opciok.map(o => h('button', { class: 'btn', style: 'display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px', onclick: () => { valasz = o.v; zar(); } },
+    h('div', { style: 'font-weight:600' }, o.l), h('div', { class: 'muted', style: 'font-size:12px' }, o.d))));
+  let zar = () => { };
+  await modal('Mit veszel fel?', body, [{ l: 'Mégse', v: null }], c => { zar = () => c(true); });
+  if (!valasz) return;
+  if (valasz === 'ide') return ujTetel(ujCikkAlap(cel.id));
+  if (valasz === 'b') { const per = [...S.tetel.values()].filter(x => x.biblio_szint === 's'); return ujTetel({ biblio_szint: 'b', szulo_id: per.length === 1 ? per[0].id : null, sorszam: per.length === 1 ? kovSorszam(per[0].id, 'b') : '', _autoSorszam: true }); }
+  return ujTetel({ biblio_szint: valasz, sorszam: valasz === 'a' ? '' : kovSorszam(null, valasz), _autoSorszam: true, ...(valasz === 'm' ? { kiadvany_tipus: 'önálló kiadvány' } : valasz === 's' ? { kiadvany_tipus: 'periodika' } : {}) });
 }
 function repSor(cols, kids, onDel) {
   return h('div', { class: 'reprow', style: `grid-template-columns:${cols} auto` }, ...kids, h('button', { class: 'btn sm ghost x', title: 'Sor törlése', onclick: onDel }, '✕'));
@@ -1010,7 +1164,7 @@ function blokkDig(F) {
 }
 const TETEL_OSZLOPOK = ['id', 'sorszam', 'biblio_szint', 'szulo_id', 'evfolyam_szam', 'cim', 'alcim', 'cim_nemrendezo', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'rda_media', 'rda_hordozo', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'digitalizalva', 'bizonyossag', 'adat_forrasa', 'forras_hivatkozas', 'forras_url', 'hozzaferes', 'megjegyzes', 'annotator', 'felvitel_datuma', 'ellenorizve', 'ures_mezok'];
 const tisztit = (o, mezok) => { const r = {}; for (const k of mezok) if (k in o) r[k] = (o[k] === '' ? null : o[k]); return r; };
-async function mentTetel() {
+async function mentTetel(kovetkezo = false) {
   const F = S.form, t = F.t;
   if (!t.sorszam?.trim()) return toast('A sorszám kötelező.', true);
   if (t.biblio_szint !== 'b' && !t.cim?.trim()) return toast('A cím kötelező (ha nincs, adj meg leíró címet szögletes zárójelben).', true);
@@ -1032,6 +1186,16 @@ async function mentTetel() {
   if (lt) S.tetel.set(id, lt);
   if (lt?.szulo_id) S.nyitott.add(lt.szulo_id);
   toast('Mentve: ' + t.sorszam);
+  // a következő felvitelhez megjegyzett alapértékek
+  S.utolso = Object.fromEntries(['annotator', 'bizonyossag', 'adat_forrasa', 'hozzaferes', 'digitalizalva'].filter(k => t[k] != null).map(k => [k, t[k]]));
+  S.utolsoPld = F.pld.filter(p => p.orzo_id).map(p => ({ orzo_id: p.orzo_id }));
+  if (kovetkezo && ['a', 'b'].includes(t.biblio_szint)) {
+    const alap = t.biblio_szint === 'a'
+      ? { ...ujCikkAlap(t.szulo_id), nyelv: t.nyelv, rovat: t.rovat, _koz: F.koz.filter(k => k.szerep === 'edt').map(k => ({ entitas_id: k.entitas_id, szerep: 'edt', sorrend: k.sorrend, kikovetkeztetett: k.kikovetkeztetett, bizonyossag: k.bizonyossag, nev_a_forrasban: k.nev_a_forrasban })) }
+      : { biblio_szint: 'b', szulo_id: t.szulo_id, sorszam: kovSorszam(t.szulo_id, 'b'), _autoSorszam: true, sokszorositasi_technika: t.sokszorositasi_technika, ar: t.ar };
+    S.selTetel = id; S.drawList?.();
+    return ujTetel(alap);
+  }
   await megnyitTetel(id, true);
 }
 async function masolTetel() {
