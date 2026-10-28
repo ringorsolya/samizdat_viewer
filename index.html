@@ -147,6 +147,7 @@ table.t th{color:var(--muted);font-weight:600;font-size:12px}
     <button data-v="export">Export</button>
     <button data-v="szotarak">Szótárak</button>
     <button data-v="naplo">Napló</button>
+    <button data-v="munkatarsak" id="navMt" class="hidden">Munkatársak</button>
   </nav>
   <div class="user"><span id="whoami"></span>
     <button class="btn sm ghost" id="themeBtn" title="Világos/sötét">◐</button>
@@ -524,6 +525,7 @@ async function startApp(session) {
     await sb.auth.signOut(); renderLogin(); return;
   }
   S.admin = me.szerep === 'admin';
+  $('#navMt').classList.toggle('hidden', !S.admin);
   $('#whoami').textContent = me.nev || S.email;
   $('#hdr').classList.remove('hidden');
   $('#app').innerHTML = '<div class="page" style="padding:40px">Betöltés…</div>';
@@ -547,7 +549,7 @@ async function go(view, id = null) {
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
   const app = $('#app'); app.innerHTML = '';
-  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo }[S.view] || viewTetelek)(app);
+  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo, munkatarsak: viewMunkatarsak }[S.view] || viewTetelek)(app);
 }
 
 /* =====================================================================
@@ -1411,10 +1413,9 @@ function viewSzotarak(app) {
   const side = h('div', { class: 'side' }, h('div', { class: 'tools' }, h('b', {}, 'Szótárlisták')), h('div', { class: 'list' },
     ...listak.map(l => h('div', { class: 'row' + (S.szl === l ? ' sel' : ''), onclick: () => { S.szl = l; render(); } }, h('span', { class: 't' }, l), h('span', { class: 'tw' }, Object.keys(S.szotar[l] || {}).length))),
     h('div', { class: 'row' + (S.szl === '__tul' ? ' sel' : ''), onclick: () => { S.szl = '__tul'; render(); } }, h('span', { class: 't' }, h('i', {}, 'tulajdonságok (állításokhoz)'))),
-    S.admin ? h('div', { class: 'row' + (S.szl === '__mt' ? ' sel' : ''), onclick: () => { S.szl = '__mt'; render(); } }, h('span', { class: 't' }, h('i', {}, 'munkatársak'))) : null));
+    null));
   const content = h('div', { class: 'content' }); const page = h('div', { class: 'page' }); content.append(page);
   app.append(h('div', { class: 'split' }, side, content));
-  if (S.szl === '__mt') return munkatarsak(page);
   if (S.szl === '__tul') return tulajdonsagok(page);
   const l = S.szl, rows = Object.values(S.szotar[l] || {}).sort((a, b) => a.sorrend - b.sorrend);
   const hasznal = S.kodmezo.filter(k => k.lista === l).map(k => `${k.tabla.replace('szd_', '')}.${k.oszlop}`);
@@ -1446,6 +1447,12 @@ function tulajdonsagok(page) {
     h('table', { class: 't' }, h('thead', {}, h('tr', {}, ...['Kód', 'Címke', 'Érték', 'Kinek', 'Cél', 'Wikidata'].map(x => h('th', {}, x)))),
       h('tbody', {}, ...S.tulajdonsag.map(p => h('tr', {}, h('td', { class: 'mono' }, p.kod), h('td', {}, p.cimke), h('td', {}, p.ertek_tipus), h('td', {}, p.alany_tipusok.join(', ')), h('td', {}, (p.cel_tipusok || []).join(', ')), h('td', { class: 'mono' }, p.wikidata_pid || ''))))));
   page.append(h('div', { class: 'note', style: 'margin-top:12px' }, 'Új tulajdonságot jelenleg az adminisztrátor vesz fel közvetlenül az adatbázisban (szd_tulajdonsag tábla), hogy a Wikidata-megfeleltetés egységes maradjon.'));
+}
+function viewMunkatarsak(app) {
+  const page = h('div', { class: 'page', style: 'padding:16px' });
+  app.append(h('div', { class: 'content', style: 'height:100%' }, page));
+  if (!S.admin) { page.append(h('p', {}, 'Ehhez a részhez adminisztrátori jogosultság kell.')); return; }
+  munkatarsak(page);
 }
 async function munkatarsak(page) {
   const { data, error } = await sb.from('szd_munkatarsak').select('*').order('email');

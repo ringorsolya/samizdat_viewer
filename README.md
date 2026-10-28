@@ -21,7 +21,7 @@ a munkatársak listáján szereplő felhasználóknak mutat és enged szerkeszte
 ## Hozzáférés
 
 Új munkatárs: a Supabase-projektben *Authentication → Users → Add user* (Auto Confirm),
-majd a felületen *Szótárak → munkatársak* alatt felvenni.
+majd a felületen a *Munkatársak* fülön (csak adminisztrátornak látszik) felvenni.
 
 A felületben szereplő Supabase-kulcs nyilvános (publishable) kulcs; az adatokhoz
 csak bejelentkezéssel és munkatársi jogosultsággal lehet hozzáférni.
