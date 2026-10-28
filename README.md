@@ -16,7 +16,8 @@ a munkatársak listáján szereplő felhasználóknak mutat és enged szerkeszte
   dátumtípust az export számolja.
 - **Export**: MARC 21 (MARCXML, ISO 2709 `.mrc`, MarcEdit `.mrk`) és lapos CSV.
   Wikidata-URI a `$1`, VIAF/GND/ISNI a `$0` almezőben.
-- Ellenőrzendő kérdések, szótárkezelés, változásnapló.
+- **Háló** (szövegterjedés, szereplők, említések, kulcsszavak; GEXF/GraphML/CSV-export) és **Térkép** (kiadási helyek, átvételi útvonalak, tárgyhelyek) – Cytoscape.js és Leaflet.
+- Ellenőrzendő kérdések, szótárkezelés, változásnapló, súgó.
 
 ## Hozzáférés
 

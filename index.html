@@ -143,6 +143,8 @@ table.t th{color:var(--muted);font-weight:600;font-size:12px}
   <nav id="nav">
     <button data-v="tetelek">Tételek</button>
     <button data-v="entitasok">Entitások</button>
+    <button data-v="halo">Háló</button>
+    <button data-v="terkep">Térkép</button>
     <button data-v="ellenorzendo">Ellenőrzendő <span class="cnt hidden" id="ellcnt"></span></button>
     <button data-v="export">Export</button>
     <button data-v="szotarak">Szótárak</button>
@@ -555,7 +557,7 @@ async function go(view, id = null) {
 function render() {
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === S.view));
   const app = $('#app'); app.innerHTML = '';
-  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo, munkatarsak: viewMunkatarsak, sugo: viewSugo }[S.view] || viewTetelek)(app);
+  ({ tetelek: viewTetelek, entitasok: viewEntitasok, ellenorzendo: viewEll, export: viewExport, szotarak: viewSzotarak, naplo: viewNaplo, munkatarsak: viewMunkatarsak, sugo: viewSugo, halo: viewHalo, terkep: viewTerkep }[S.view] || viewTetelek)(app);
 }
 
 /* =====================================================================
@@ -1580,6 +1582,264 @@ function viewExport(app) {
   app.append(h('div', { class: 'content', style: 'height:100%' }, page));
 }
 /* =====================================================================
+   NÉZEGETŐ: HÁLÓ ÉS TÉRKÉP
+   ===================================================================== */
+const LIB = {
+  cy: 'https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js',
+  lf: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+  lfcss: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'
+};
+const _betoltve = {};
+function scriptBetolt(src) {
+  return _betoltve[src] ||= new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Nem tölthető be: ' + src)); document.head.append(s); });
+}
+function cssBetolt(href) {
+  if (!_betoltve[href]) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.append(l); _betoltve[href] = true; }
+}
+async function vizDb() {
+  const [db, hely, test] = await Promise.all([marcDb(), fetchAll('szd_hely', '*', 'entitas_id'), fetchAll('szd_testulet', '*', 'entitas_id')]);
+  db.hely = new Map(hely.map(x => [x.entitas_id, x]));
+  db.testulet = new Map(test.map(x => [x.entitas_id, x]));
+  return db;
+}
+const tEv = (db, t) => { const d = MARC.eff(db, t, 'datum_kezdet') || MARC.eff(db, t, 'datum_edtf'); return d ? parseInt(String(d).slice(0, 4), 10) : null; };
+const gyok = (db, t) => { let x = t; while (x && x.szulo_id) { const p = db.tetel.get(x.szulo_id); if (!p) break; x = p; } return x; };
+const aggTetel = (db, t) => t.biblio_szint === 'a' ? (gyok(db, t) || t) : t.biblio_szint === 'b' ? (gyok(db, t) || t) : t;
+const biztos = b => !b || b === 'biztos';
+const SZIN = { a: '#7a6f62', b: '#a07a2c', m: '#2f6b3f', s: '#2b5c8a', c: '#555', szemely: '#2b5c8a', testulet: '#2f6b3f', hely: '#8a5a00', fogalom: '#888', esemeny: '#9b2c2c', mu: '#7b3fa0', szoveg: '#999' };
+const UT_SZIN = { 'közvetlen': '#2f6b3f', 'nyugati kitérő': '#9b2c2c', 'harmadik ország': '#2b5c8a', 'ismeretlen': '#888' };
+
+function grafEpit(db, o) {
+  const N = new Map(), E = [];
+  const tetelOk = t => { const ev = tEv(db, t); return ev === null ? o.datumNelkul : (ev >= o.tol && ev <= o.ig); };
+  const tNode = t => {
+    const x = o.agg ? aggTetel(db, t) : t;
+    const id = 't' + x.id;
+    if (!N.has(id)) N.set(id, { id, label: x.biblio_szint === 'b' ? `${tetelCimke(x)}` : (x.cim || x.sorszam), tipus: x.biblio_szint, kat: 'tetel', ref: x.id, sorszam: x.sorszam });
+    return id;
+  };
+  const eNode = eid => {
+    const e = db.ent.get(eid); if (!e) return null;
+    const id = 'e' + eid;
+    if (!N.has(id)) N.set(id, { id, label: e.nev, tipus: e.tipus, kat: 'entitas', ref: eid });
+    return id;
+  };
+  const xNode = txt => { const id = 'x' + txt; if (!N.has(id)) N.set(id, { id, label: txt.length > 40 ? txt.slice(0, 38) + '…' : txt, tipus: 'szoveg', kat: 'szoveg', teljes: txt }); return id; };
+  const el = (s, t, label, biz, extra = {}) => { if (!s || !t || s === t) return; if (!o.bizonytalan && !biztos(biz)) return; E.push({ id: 'k' + E.length, source: s, target: t, label: label || '', biz: biztos(biz) ? 'biztos' : 'bizonytalan', ...extra }); };
+
+  if (o.mod === 'terjedes') {
+    for (const a of db.atv) {
+      const t = db.tetel.get(a.tetel_id); if (!t || !tetelOk(t)) continue;
+      const cel = tNode(t);
+      let forras = a.forras_tetel_id && db.tetel.get(a.forras_tetel_id) ? tNode(db.tetel.get(a.forras_tetel_id)) : a.forras_entitas_id ? eNode(a.forras_entitas_id) : (a.forras_leiras && o.szovegesForras ? xNode(a.forras_leiras) : null);
+      if (!forras) continue;
+      const lanc = [forras, ...(db.allomas || []).filter(x => x.atvetel_id === a.id).sort((x, y) => x.sorrend - y.sorrend).map(x => x.kozvetito_id ? eNode(x.kozvetito_id) : null).filter(Boolean), cel];
+      for (let i = 0; i < lanc.length - 1; i++) el(lanc[i], lanc[i + 1], a.atvetel_tipus, a.bizonyossag, { ut: a.utvonal_tipus || 'ismeretlen' });
+    }
+    if (o.muvek) for (const t of db.tetel.values()) if (t.mu_id && tetelOk(t)) el(eNode(t.mu_id), tNode(t), 'kiadása', 'biztos', { mu: 1 });
+  } else if (o.mod === 'szereplok') {
+    for (const k of db.koz) {
+      const t = db.tetel.get(k.tetel_id); if (!t || !tetelOk(t)) continue;
+      if (k.szerep === 'pbl' && !o.kiadok) continue;
+      el(eNode(k.entitas_id), tNode(t), cimke('szerep', k.szerep), k.bizonyossag, { szerep: k.szerep });
+    }
+  } else {
+    for (const x of db.targy) {
+      if (x.tipus !== (o.mod === 'emlites' ? 'emlitett' : 'kulcsszo')) continue;
+      const t = db.tetel.get(x.tetel_id); if (!t || !tetelOk(t)) continue;
+      el(tNode(t), eNode(x.entitas_id), '', 'biztos', { suly: x.emlitesek || 1 });
+    }
+  }
+  // csak élekben szereplő csúcsok
+  const hasznalt = new Set(E.flatMap(e => [e.source, e.target]));
+  const nodes = [...N.values()].filter(n => hasznalt.has(n.id));
+  const fok = new Map(); for (const e of E) { fok.set(e.source, (fok.get(e.source) || 0) + 1); fok.set(e.target, (fok.get(e.target) || 0) + 1); }
+  nodes.forEach(n => n.fok = fok.get(n.id) || 0);
+  return { nodes, edges: E };
+}
+function evTartomany(db) {
+  const evek = [...db.tetel.values()].map(t => tEv(db, t)).filter(Boolean);
+  return evek.length ? [Math.min(...evek), Math.max(...evek)] : [1945, 1990];
+}
+function vezerlok(db, onChange, extra = []) {
+  const [min, max] = evTartomany(db);
+  S.viz ||= {};
+  const o = S.viz;
+  o.tol ??= min; o.ig ??= max; o.bizonytalan ??= true; o.datumNelkul ??= true;
+  const tol = h('input', { type: 'number', value: o.tol, min: 1900, max: 2000, oninput: e => { o.tol = +e.target.value || min; onChange(); } });
+  const ig = h('input', { type: 'number', value: o.ig, min: 1900, max: 2000, oninput: e => { o.ig = +e.target.value || max; onChange(); } });
+  const chk = (k, l, t) => h('label', { class: 'chk', title: t || '' }, h('input', { type: 'checkbox', checked: !!o[k], onchange: e => { o[k] = e.target.checked; onChange(); } }), l);
+  return h('div', { class: 'tools' }, ...extra,
+    h('div', { class: 'sub' }, 'Időszak (a tétel megjelenési éve)'), h('div', { style: 'display:flex;gap:6px;align-items:center' }, tol, '–', ig),
+    chk('datumNelkul', 'dátum nélküli tételek is'),
+    chk('bizonytalan', 'bizonytalan kapcsolatok is', 'valószínű / feltételezett / vitatott – szaggatott vonallal'));
+}
+
+/* ---------- Háló ---------- */
+async function viewHalo(app) {
+  const side = h('div', { class: 'side' }), fo = h('div', { style: 'position:relative;min-height:0;height:100%' });
+  app.append(h('div', { class: 'split' }, side, fo));
+  fo.innerHTML = '<div class="page muted" style="padding:20px">Betöltés…</div>';
+  let db;
+  try { [db] = await Promise.all([vizDb(), scriptBetolt(LIB.cy)]); } catch (e) { fo.innerHTML = ''; fo.append(h('div', { class: 'page warnbox', style: 'margin:20px' }, hibaSzoveg(e))); return; }
+  S.viz ||= {}; const o = S.viz;
+  o.mod ??= 'terjedes'; o.agg ??= false; o.muvek ??= true; o.szovegesForras ??= true; o.kiadok ??= false;
+  const mod = h('select', { onchange: e => { o.mod = e.target.value; rajzol(); opciok(); } },
+    ...[['terjedes', 'Szövegterjedés (forrás → tétel)'], ['szereplok', 'Szereplők (ki mit írt, fordított…)'], ['emlites', 'Említett személyek'], ['kulcsszo', 'Kulcsszavak']]
+      .map(([v, l]) => h('option', { value: v, selected: o.mod === v }, l)));
+  const opcW = h('div', { style: 'display:flex;flex-direction:column;gap:4px' });
+  const chk = (k, l, t) => h('label', { class: 'chk', title: t || '' }, h('input', { type: 'checkbox', checked: !!o[k], onchange: e => { o[k] = e.target.checked; rajzol(); } }), l);
+  const opciok = () => {
+    opcW.innerHTML = '';
+    opcW.append(chk('agg', 'lap / kötet szintre összevonva', 'A cikkek helyett a lapot (pl. Demokrata) vagy a kötetet mutatja – áttekintő nézet.'));
+    if (o.mod === 'terjedes') opcW.append(chk('muvek', 'művek és kiadásaik'), chk('szovegesForras', 'csak szövegesen megadott források is'));
+    if (o.mod === 'szereplok') opcW.append(chk('kiadok', 'kiadók (pbl) is'));
+  };
+  opciok();
+  const info = h('div', { class: 'card', style: 'margin:10px;font-size:13px' }, h('div', { class: 'muted' }, 'Kattints egy pontra a részletekért.'));
+  const stat = h('div', { class: 'sub', style: 'padding:0 10px' });
+  const exp = h('div', { class: 'bar', style: 'padding:0 10px' },
+    h('button', { class: 'btn sm', onclick: () => exportGraf('gexf') }, 'GEXF (Gephi)'), h('button', { class: 'btn sm', onclick: () => exportGraf('graphml') }, 'GraphML'),
+    h('button', { class: 'btn sm', onclick: () => exportGraf('csv') }, 'CSV (NodeGoat)'));
+  side.append(vezerlok(db, () => rajzol(), [h('div', { class: 'sub' }, 'Háló típusa'), mod, opcW]), stat, exp, info,
+    h('div', { class: 'sub', style: 'padding:0 10px 10px' }, 'Pontméret: kapcsolatok száma. Szaggatott vonal: bizonytalan kapcsolat. Színek: kék = személy / lap, zöld = testület / kötet, barna = cikk, lila = mű.'));
+  let G = null, cy = null;
+  const rajzol = () => {
+    G = grafEpit(db, o);
+    stat.textContent = `${G.nodes.length} pont, ${G.edges.length} kapcsolat`;
+    fo.innerHTML = '';
+    if (!G.edges.length) { fo.append(h('div', { class: 'page muted', style: 'padding:20px' }, 'Ezekkel a beállításokkal nincs megjeleníthető kapcsolat.')); return; }
+    const box = h('div', { style: 'position:absolute;inset:0' }); fo.append(box);
+    const dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.getAttribute('data-theme') !== 'light' || document.documentElement.getAttribute('data-theme') === 'dark';
+    cy = window.cytoscape({
+      container: box, wheelSensitivity: 0.3,
+      elements: [...G.nodes.map(n => ({ data: { ...n, szin: SZIN[n.tipus] || '#888', meret: 14 + Math.min(40, n.fok * 4) } })), ...G.edges.map(e => ({ data: { ...e, szin: e.mu ? '#7b3fa0' : (o.mod === 'terjedes' ? (UT_SZIN[e.ut] || '#888') : '#999') } }))],
+      style: [
+        { selector: 'node', style: { 'background-color': 'data(szin)', width: 'data(meret)', height: 'data(meret)', label: 'data(label)', 'font-size': 9, color: dark ? '#ddd' : '#333', 'text-wrap': 'ellipsis', 'text-max-width': 120, 'text-valign': 'bottom', 'text-margin-y': 3 } },
+        { selector: 'node[kat = "tetel"]', style: { shape: 'round-rectangle' } },
+        { selector: 'node[tipus = "mu"]', style: { shape: 'diamond' } },
+        { selector: 'node[kat = "szoveg"]', style: { shape: 'tag', 'background-opacity': 0.5 } },
+        { selector: 'edge', style: { width: 1.5, 'line-color': 'data(szin)', 'target-arrow-color': 'data(szin)', 'target-arrow-shape': o.mod === 'terjedes' ? 'triangle' : 'none', 'curve-style': 'bezier', opacity: 0.8 } },
+        { selector: 'edge[biz = "bizonytalan"]', style: { 'line-style': 'dashed', opacity: 0.5 } },
+        { selector: 'edge[mu = 1]', style: { 'line-style': 'dotted' } },
+        { selector: ':selected', style: { 'border-width': 3, 'border-color': '#c0504d' } }
+      ],
+      layout: { name: 'cose', animate: false, nodeRepulsion: 9000, idealEdgeLength: 70, padding: 30 }
+    });
+    cy.on('tap', 'node', ev => {
+      const n = ev.target.data();
+      const kapcs = ev.target.connectedEdges().map(e => { const d = e.data(); const masik = d.source === n.id ? d.target : d.source; return `${d.label ? d.label + ': ' : ''}${cy.getElementById(masik).data('label')}`; });
+      info.innerHTML = '';
+      info.append(h('div', { style: 'font-weight:600' }, n.teljes || n.label), h('div', { class: 'muted' }, n.kat === 'tetel' ? `${SZINT_NEV[n.tipus]} · ${n.sorszam}` : n.kat === 'szoveg' ? 'szövegesen megadott forrás' : cimke('entitas_tipus', n.tipus)),
+        h('div', { style: 'margin:6px 0' }, `${n.fok} kapcsolat`), h('ul', { style: 'margin:0 0 6px;padding-left:18px;max-height:180px;overflow:auto' }, ...kapcs.slice(0, 40).map(k => h('li', {}, k))),
+        n.kat !== 'szoveg' ? h('button', { class: 'btn sm', onclick: () => go(n.kat === 'tetel' ? 'tetelek' : 'entitasok', n.ref) }, 'Megnyitás') : null);
+    });
+  };
+  const exportGraf = forma => {
+    if (!G) return;
+    const nap = new Date().toISOString().slice(0, 10), nev = `szamizdat_halo_${o.mod}_${nap}`;
+    const X = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    if (forma === 'gexf') {
+      letolt(nev + '.gexf', `<?xml version="1.0" encoding="UTF-8"?>\n<gexf xmlns="http://gexf.net/1.3" version="1.3">\n<graph defaultedgetype="${o.mod === 'terjedes' ? 'directed' : 'undirected'}">\n<attributes class="node"><attribute id="0" title="tipus" type="string"/><attribute id="1" title="kategoria" type="string"/></attributes>\n<attributes class="edge"><attribute id="0" title="bizonyossag" type="string"/><attribute id="1" title="utvonal" type="string"/></attributes>\n<nodes>\n` +
+        G.nodes.map(n => `<node id="${X(n.id)}" label="${X(n.teljes || n.label)}"><attvalues><attvalue for="0" value="${X(n.tipus)}"/><attvalue for="1" value="${X(n.kat)}"/></attvalues></node>`).join('\n') +
+        `\n</nodes>\n<edges>\n` + G.edges.map(e => `<edge id="${X(e.id)}" source="${X(e.source)}" target="${X(e.target)}" label="${X(e.label)}"${e.suly ? ` weight="${e.suly}"` : ''}><attvalues><attvalue for="0" value="${X(e.biz)}"/><attvalue for="1" value="${X(e.ut || '')}"/></attvalues></edge>`).join('\n') + `\n</edges>\n</graph>\n</gexf>\n`, 'application/xml');
+    } else if (forma === 'graphml') {
+      letolt(nev + '.graphml', `<?xml version="1.0" encoding="UTF-8"?>\n<graphml xmlns="http://graphml.graphdrawing.org/xmlns">\n<key id="label" for="node" attr.name="label" attr.type="string"/><key id="tipus" for="node" attr.name="tipus" attr.type="string"/><key id="elabel" for="edge" attr.name="label" attr.type="string"/><key id="biz" for="edge" attr.name="bizonyossag" attr.type="string"/>\n<graph edgedefault="${o.mod === 'terjedes' ? 'directed' : 'undirected'}">\n` +
+        G.nodes.map(n => `<node id="${X(n.id)}"><data key="label">${X(n.teljes || n.label)}</data><data key="tipus">${X(n.tipus)}</data></node>`).join('\n') + '\n' +
+        G.edges.map(e => `<edge source="${X(e.source)}" target="${X(e.target)}"><data key="elabel">${X(e.label)}</data><data key="biz">${X(e.biz)}</data></edge>`).join('\n') + `\n</graph>\n</graphml>\n`, 'application/xml');
+    } else {
+      const q = v => { v = v == null ? '' : String(v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      letolt(nev + '_pontok.csv', '﻿' + [['id', 'label', 'tipus', 'kategoria', 'kapcsolatok'], ...G.nodes.map(n => [n.id, n.teljes || n.label, n.tipus, n.kat, n.fok])].map(r => r.map(q).join(';')).join('\r\n'), 'text/csv;charset=utf-8');
+      setTimeout(() => letolt(nev + '_elek.csv', '﻿' + [['source', 'target', 'label', 'bizonyossag', 'utvonal', 'suly'], ...G.edges.map(e => [e.source, e.target, e.label, e.biz, e.ut || '', e.suly || 1])].map(r => r.map(q).join(';')).join('\r\n'), 'text/csv;charset=utf-8'), 400);
+    }
+  };
+  rajzol();
+}
+
+/* ---------- Térkép ---------- */
+async function viewTerkep(app) {
+  const side = h('div', { class: 'side' }), fo = h('div', { style: 'position:relative;min-height:0;height:100%' });
+  app.append(h('div', { class: 'split' }, side, fo));
+  fo.innerHTML = '<div class="page muted" style="padding:20px">Betöltés…</div>';
+  let db;
+  try { cssBetolt(LIB.lfcss); [db] = await Promise.all([vizDb(), scriptBetolt(LIB.lf)]); } catch (e) { fo.innerHTML = ''; fo.append(h('div', { class: 'page warnbox', style: 'margin:20px' }, hibaSzoveg(e))); return; }
+  S.viz ||= {}; const o = S.viz;
+  o.reteg_kiad ??= true; o.reteg_ut ??= true; o.reteg_targy ??= false;
+  const chk = (k, l) => h('label', { class: 'chk' }, h('input', { type: 'checkbox', checked: !!o[k], onchange: e => { o[k] = e.target.checked; rajzol(); } }), l);
+  const hiany = h('div', { class: 'card', style: 'margin:10px;font-size:13px' });
+  const jel = h('div', { class: 'sub', style: 'padding:0 10px' }, 'Vonalak színe: ', ...Object.entries(UT_SZIN).map(([k, v]) => h('span', { style: `color:${v};font-weight:600;margin-right:6px` }, k)), ' · szaggatott = bizonytalan');
+  side.append(vezerlok(db, () => rajzol(), [h('div', { class: 'sub' }, 'Rétegek'), chk('reteg_kiad', 'kiadási helyek'), chk('reteg_ut', 'átvételi útvonalak'), chk('reteg_targy', 'a tételek tárgyában szereplő helyek')]), jel, hiany);
+  fo.innerHTML = '';
+  const box = h('div', { style: 'position:absolute;inset:0' }); fo.append(box);
+  const L = window.L;
+  const map = L.map(box, { worldCopyJump: true }).setView([50, 17], 5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '&copy; OpenStreetMap-közreműködők' }).addTo(map);
+  const reteg = L.layerGroup().addTo(map);
+  const koord = eid => { const hx = db.hely.get(eid); return hx && hx.szelesseg != null && hx.hosszusag != null ? [+hx.szelesseg, +hx.hosszusag] : null; };
+  const entHely = eid => { const e = db.ent.get(eid); if (!e) return null; if (e.tipus === 'hely') return eid; if (e.tipus === 'testulet') return db.testulet.get(eid)?.szekhely_id || null; return null; };
+  const tetelHely = t => MARC.eff(db, t, 'kiadas_helye_id');
+  const rajzol = () => {
+    reteg.clearLayers();
+    const tetelOk = t => { const ev = tEv(db, t); return ev === null ? o.datumNelkul : (ev >= o.tol && ev <= o.ig); };
+    const pontok = [];
+    // kiadási helyek
+    const helyTetelek = new Map(), helyNelkul = [];
+    for (const t of db.tetel.values()) {
+      if (!['a', 'm'].includes(t.biblio_szint) || !tetelOk(t)) continue;
+      const hid = tetelHely(t); const k = hid ? koord(hid) : null;
+      if (!k) { helyNelkul.push(t); continue; }
+      if (!helyTetelek.has(hid)) helyTetelek.set(hid, []); helyTetelek.get(hid).push(t);
+    }
+    if (o.reteg_kiad) for (const [hid, ts] of helyTetelek) {
+      const k = koord(hid); pontok.push(k);
+      L.circleMarker(k, { radius: 5 + Math.min(20, Math.sqrt(ts.length) * 3), color: '#2b5c8a', weight: 1, fillOpacity: 0.55 }).addTo(reteg)
+        .bindPopup(`<b>${esc(db.ent.get(hid)?.nev)}</b><br>${ts.length} tétel<br><small>${ts.slice(0, 12).map(t => esc(t.sorszam + ' · ' + (t.cim || ''))).join('<br>')}${ts.length > 12 ? '<br>…' : ''}</small>`);
+    }
+    // útvonalak
+    let rajzolt = 0; const nemRajzolt = [], forrasHelyNelkul = new Map();
+    if (o.reteg_ut) for (const a of db.atv) {
+      const t = db.tetel.get(a.tetel_id); if (!t || !tetelOk(t)) continue;
+      if (!o.bizonytalan && !biztos(a.bizonyossag)) continue;
+      const pts = [];
+      const ft = a.forras_tetel_id ? db.tetel.get(a.forras_tetel_id) : null;
+      const fh = ft ? tetelHely(ft) : a.forras_entitas_id ? entHely(a.forras_entitas_id) : null;
+      if (fh && koord(fh)) pts.push(koord(fh));
+      else if (a.forras_entitas_id) forrasHelyNelkul.set(a.forras_entitas_id, (forrasHelyNelkul.get(a.forras_entitas_id) || 0) + 1);
+      for (const x of (db.allomas || []).filter(x => x.atvetel_id === a.id).sort((p, q) => p.sorrend - q.sorrend)) {
+        const k = x.hely_id ? koord(x.hely_id) : x.kozvetito_id ? koord(entHely(x.kozvetito_id)) : null;
+        if (k) pts.push(k);
+      }
+      const th = tetelHely(t); if (th && koord(th)) pts.push(koord(th));
+      const egyedi = pts.filter((p, i) => i === 0 || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]);
+      if (egyedi.length < 2) { nemRajzolt.push(a); continue; }
+      rajzolt++; pontok.push(...egyedi);
+      const szin = UT_SZIN[a.utvonal_tipus] || '#888';
+      L.polyline(egyedi, { color: szin, weight: 2.5, opacity: biztos(a.bizonyossag) ? 0.85 : 0.5, dashArray: biztos(a.bizonyossag) ? null : '6 6' }).addTo(reteg)
+        .bindPopup(`<b>${esc(t.sorszam)} · ${esc(t.cim || '')}</b><br>${esc(a.atvetel_tipus || 'átvétel')}: ${esc(a.forras_leiras || db.ent.get(a.forras_entitas_id)?.nev || '')}<br>útvonal: ${esc(a.utvonal_tipus || '?')}`);
+      egyedi.forEach((p, i) => L.circleMarker(p, { radius: 3, color: szin, fillOpacity: 1 }).addTo(reteg));
+    }
+    // tárgyhelyek
+    if (o.reteg_targy) {
+      const m = new Map();
+      for (const x of db.targy) { const e = db.ent.get(x.entitas_id); const t = db.tetel.get(x.tetel_id); if (e?.tipus !== 'hely' || !t || !tetelOk(t)) continue; const k = koord(e.id); if (!k) continue; if (!m.has(e.id)) m.set(e.id, []); m.get(e.id).push(t); }
+      for (const [eid, ts] of m) { const k = koord(eid); pontok.push(k); L.circleMarker(k, { radius: 4 + Math.min(14, ts.length * 2), color: '#8a5a00', weight: 1, fillOpacity: 0.35 }).addTo(reteg).bindPopup(`<b>${esc(db.ent.get(eid)?.nev)}</b> (tárgy)<br>${ts.length} tétel`); }
+    }
+    if (pontok.length) map.fitBounds(L.latLngBounds(pontok).pad(0.3), { maxZoom: 7 });
+    // hiánylista
+    hiany.innerHTML = '';
+    hiany.append(h('div', { style: 'font-weight:600;margin-bottom:4px' }, 'Mi hiányzik a térképhez?'),
+      h('div', {}, `${rajzolt} átvételi útvonal kirajzolva, ${nemRajzolt.length} nem (kevesebb mint két ismert hely).`),
+      helyNelkul.length ? h('div', {}, `${helyNelkul.length} tételnek nincs kiadási helye (vagy a helynek nincs koordinátája).`) : null);
+    if (forrasHelyNelkul.size) hiany.append(h('div', { style: 'margin-top:6px' }, 'Források hely nélkül – add meg a székhelyüket az Entitások fülön:'),
+      h('ul', { style: 'margin:4px 0 0;padding-left:18px' }, ...[...forrasHelyNelkul].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([eid, n]) => h('li', {}, h('a', { href: '#', onclick: e => { e.preventDefault(); go('entitasok', eid); } }, db.ent.get(eid)?.nev), ` (${n})`))));
+    const koordNelkul = [...db.ent.values()].filter(e => e.tipus === 'hely' && !koord(e.id));
+    if (koordNelkul.length) hiany.append(h('div', { style: 'margin-top:6px' }, 'Helyek koordináta nélkül (Wikidata-gombbal pótolható): ', ...koordNelkul.slice(0, 15).map((e, i) => [i ? ', ' : '', h('a', { href: '#', onclick: ev => { ev.preventDefault(); go('entitasok', e.id); } }, e.nev)]).flat()));
+  };
+  rajzol();
+  setTimeout(() => map.invalidateSize(), 50);
+}
+
+/* =====================================================================
    SÚGÓ
    ===================================================================== */
 const MARC_TABLA = [
@@ -1660,6 +1920,11 @@ function viewSugo(app) {
         [b('Útvonal-állomások'), ': a szöveg útja a forrástól a tételig, sorrendben – hely és/vagy közvetítő (pl. München, Ujváry „GRIFF” Verlag), dátummal és bizonyossággal. Ebből rajzolhatók ki az ívek a térképen.'],
         [b('Útvonal típusa'), ': közvetlen, nyugati kitérő, harmadik ország, ismeretlen (Kind-Kovács 2014 a tamizdat „nyugati kitérőjéről”).']),
       p('Bizonytalan átvételnél állítsd a bizonyosságot „valószínű” vagy „feltételezett” értékre – a vizualizáció ezt halványabb, szaggatott vonallal fogja jelölni (Drucker 2011).')),
+    resz('viz', 'Háló és térkép',
+      p(b('Háló'), ' fül – négyféle kapcsolatháló: ', b('szövegterjedés'), ' (forrás → [közvetítők] → tétel, valamint mű → kiadásai), ', b('szereplők'), ' (ki írta, fordította, szerkesztette), ', b('említett személyek'), ' és ', b('kulcsszavak'), '. A „lap / kötet szintre összevonva” beállítás a cikkek helyett a lapokat mutatja – így látszik, melyik lap honnan merít. Pontra kattintva a kapcsolatai és a „Megnyitás” gomb jelenik meg.'),
+      p('Exportálható ', b('GEXF'), ' (Gephi), ', b('GraphML'), ' és ', b('CSV'), ' (pontok + élek, pl. NodeGoatba) formában – a mélyebb elemzéshez (centralitás, közvetítő szerepek) ezek a megszokott eszközök.'),
+      p(b('Térkép'), ' fül – a kiadási helyek (körméret = tételszám), az átvételi útvonalak (forrás helye → állomások → kiadás helye; szín = útvonaltípus) és a tételek tárgyában szereplő helyek. A forrás helye a forrás-entitás székhelye (testületnél) vagy maga a hely; ha nincs megadva, a térkép oldalsávja felsorolja, mit kell pótolni.'),
+      p('Mindkét nézet szűrhető időszakra, és a bizonytalan kapcsolatok elrejthetők; megjelenítve szaggatott vonallal látszanak.')),
     resz('wiki', 'Wikidata és más azonosítók',
       p('Az Entitások fülön a ', b('Wikidata-keresés'), ' gombbal kereshető meg az illető a Wikidatán (magyar, lengyel, angol, német nyelven). A kiválasztás után a felület felajánlja a VIAF-, GND-, ISNI-, GeoNames-azonosítót, a születési és halálozási évet és a koordinátákat is.'),
       p('A MARC-exportban a Wikidata-, GeoNames- és FactGrid-hivatkozás a ', kbd('$1'), ' (valós entitás URI-ja), a VIAF, GND és ISNI a ', kbd('$0'), ' (besorolási rekord URI-ja) almezőbe kerül (MARC Proposal 2017-08).')),
