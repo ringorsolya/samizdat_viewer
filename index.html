@@ -239,8 +239,10 @@ const MARC = (() => {
     if (mod.length === 14) cf('005', mod + '.0');
     cf('008', f008(db, t));
     df('040', ' ', ' ', [['b', 'hun'], ['e', 'rda']]);
-    const ny = szk(db, 'nyelv', t.nyelv)?.marc_kod, eny = szk(db, 'nyelv', t.eredeti_nyelv)?.marc_kod;
-    if (ny && eny && ny !== eny) df('041', '1', ' ', [['a', ny], ['h', eny]]);
+    const ny = szk(db, 'nyelv', t.nyelv)?.marc_kod, eny = szk(db, 'nyelv', t.eredeti_nyelv)?.marc_kod,
+      kny = szk(db, 'nyelv', t.kozvetito_nyelv)?.marc_kod;
+    if (ny && ((eny && ny !== eny) || (kny && kny !== ny)))
+      df('041', '1', ' ', [['a', ny], ...(kny && kny !== ny ? [['k', kny]] : []), ...(eny && eny !== ny ? [['h', eny]] : [])]);
 
     const koz = db.koz.filter(k => k.tetel_id === t.id).sort((a, b) => (a.sorrend || 0) - (b.sorrend || 0) || a.id - b.id);
     const fo = koz.find(k => k.szerep === 'aut');
@@ -640,7 +642,7 @@ async function ujEntitasDialog(nev, tipusok) {
 /* =====================================================================
    TÉTELEK
    ===================================================================== */
-const URES_OK = new Set(['alcim', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'orszag_kod', 'datum_atirt', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'forras_url', 'evfolyam_szam']);
+const URES_OK = new Set(['alcim', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'orszag_kod', 'datum_atirt', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'kozvetito_nyelv', 'eredeti_nyelv', 'mufaj', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'forras_url', 'evfolyam_szam']);
 const ORKOL = new Set(['kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'rda_media', 'rda_hordozo', 'nyelv']);
 const TBLOKK = [
   { id: 'azon', cim: 'AZONOSÍTÁS', mezok: [
@@ -669,8 +671,9 @@ const TBLOKK = [
     { k: 'oldal_pozicio', l: 'Oldal(ak) a gazdadokumentumban', csak: ['a'], help: 'pl. 25-26' },
     { k: 'terjedelem_oldal', l: 'Terjedelem (oldal)', t: 'int' }] },
   { id: 'nyelv', cim: 'NYELV / FORMA', mezok: [
-    { k: 'nyelv', l: 'Nyelv', t: 'kod', lista: 'nyelv' },
-    { k: 'eredeti_nyelv', l: 'Eredeti nyelv', t: 'kod', lista: 'nyelv', help: 'Fordításnál. MARC 041 $h.' },
+    { k: 'nyelv', l: 'A közlés nyelve', t: 'kod', lista: 'nyelv', help: 'Amilyen nyelven a tétel megjelent. MARC 041 $a.' },
+    { k: 'kozvetito_nyelv', l: 'Közvetítő nyelv', t: 'kod', lista: 'nyelv', help: 'Annak a szövegnek a nyelve, amelyből a közölt szöveg készült (pl. magyar → német → lengyel: német). MARC 041 $k.' },
+    { k: 'eredeti_nyelv', l: 'Keletkezési nyelv', t: 'kod', lista: 'nyelv', help: 'Amilyen nyelven a szöveg eredetileg keletkezett. MARC 041 $h.' },
     { k: 'mufaj', l: 'Műfaj', t: 'kod', lista: 'mufaj' },
     { k: 'tartalom_tipus', l: 'Tartalomtípus (RDA)', t: 'kod', lista: 'tartalom_tipus' },
     { k: 'rda_media', l: 'Médiatípus (RDA)', t: 'kod', lista: 'rda_media' },
@@ -912,14 +915,14 @@ function edtfParse(s) {
 const SZINT_ROVID = { a: 'cikk', b: 'szám', m: 'kötet', s: 'lap', c: 'gyűjt.' };
 const SZINT_NEV = { a: 'Cikk, kép vagy rövidhír', b: 'Periodikaszám', m: 'Önálló kiadvány', s: 'Periodika', c: 'Gyűjtemény / sorozat' };
 const GYORS = {
-  a: ['szulo_id', 'cim', 'alcim', 'mufaj', 'nyelv', 'eredeti_nyelv', 'oldal_pozicio', 'rovat', 'mu_id'],
-  m: ['cim', 'alcim', 'mu_id', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'kiadvany_tipus', 'sokszorositasi_technika'],
+  a: ['szulo_id', 'cim', 'alcim', 'mufaj', 'nyelv', 'kozvetito_nyelv', 'eredeti_nyelv', 'oldal_pozicio', 'rovat', 'mu_id'],
+  m: ['cim', 'alcim', 'mu_id', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf', 'terjedelem_oldal', 'nyelv', 'kozvetito_nyelv', 'eredeti_nyelv', 'mufaj', 'kiadvany_tipus', 'sokszorositasi_technika'],
   b: ['szulo_id', 'evfolyam_szam', 'datum_edtf', 'ar', 'sokszorositasi_technika'],
   s: ['cim', 'alcim', 'kiado_atirt', 'kiadas_helye_atirt', 'datum_edtf'],
   c: ['cim', 'datum_edtf']
 };
 const GYORS_CIMKE = {
-  cim: 'Cím', alcim: 'Alcím', mufaj: 'Műfaj', nyelv: 'Nyelv', eredeti_nyelv: 'Eredeti nyelv (ha fordítás)', oldal_pozicio: 'Oldal', rovat: 'Rovat',
+  cim: 'Cím', alcim: 'Alcím', mufaj: 'Műfaj', nyelv: 'A közlés nyelve', kozvetito_nyelv: 'Közvetítő nyelv (ha fordításból fordították)', eredeti_nyelv: 'Keletkezési nyelv (ha fordítás)', oldal_pozicio: 'Oldal', rovat: 'Rovat',
   kiado_atirt: 'Kiadó', kiadas_helye_atirt: 'Kiadás helye', datum_edtf: 'Megjelenés ideje', terjedelem_oldal: 'Oldalszám', kiadvany_tipus: 'Kiadvány típusa',
   sokszorositasi_technika: 'Sokszorosítás', evfolyam_szam: 'Évfolyam, szám', ar: 'Ár'
 };
@@ -1200,7 +1203,7 @@ function blokkDig(F) {
   wrap.append(h('button', { class: 'btn sm', onclick: () => { F.dig.push({}); S.dirty = true; drawTetelForm(); } }, '+ Digitális objektum'));
   return [wrap];
 }
-const TETEL_OSZLOPOK = ['id', 'sorszam', 'biblio_szint', 'szulo_id', 'evfolyam_szam', 'cim', 'alcim', 'cim_nemrendezo', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'rda_media', 'rda_hordozo', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'digitalizalva', 'bizonyossag', 'adat_forrasa', 'forras_hivatkozas', 'forras_url', 'hozzaferes', 'megjegyzes', 'annotator', 'felvitel_datuma', 'ellenorizve', 'ures_mezok', 'mu_id'];
+const TETEL_OSZLOPOK = ['id', 'sorszam', 'biblio_szint', 'szulo_id', 'evfolyam_szam', 'cim', 'alcim', 'cim_nemrendezo', 'felelossegi_kozles', 'rovat', 'sorozat', 'kiado_atirt', 'kiadas_helye_atirt', 'kiadas_helye_id', 'orszag_kod', 'datum_atirt', 'datum_edtf', 'datum_tipus', 'datum_kezdet', 'datum_veg', 'oldal_pozicio', 'terjedelem_oldal', 'nyelv', 'kozvetito_nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'rda_media', 'rda_hordozo', 'kiadvany_tipus', 'peldanyszam', 'ar', 'sokszorositasi_technika', 'tartalmi_kivonat', 'digitalizalva', 'bizonyossag', 'adat_forrasa', 'forras_hivatkozas', 'forras_url', 'hozzaferes', 'megjegyzes', 'annotator', 'felvitel_datuma', 'ellenorizve', 'ures_mezok', 'mu_id'];
 const tisztit = (o, mezok) => { const r = {}; for (const k of mezok) if (k in o) r[k] = (o[k] === '' ? null : o[k]); return r; };
 async function mentTetel(kovetkezo = false) {
   const F = S.form, t = F.t;
@@ -1845,7 +1848,7 @@ async function viewTerkep(app) {
 const MARC_TABLA = [
   ['Leader/07', 'A tétel típusa: cikk periodikában → b; cikk kötetben → a; önálló kiadvány → m; periodika → s; gyűjtemény → c. A periodikaszám nem önálló rekord, adatai a cikkek 773 $g mezőjébe kerülnek.'],
   ['001, 005, 008', 'Sorszám; utolsó módosítás ideje; 008: felvitel dátuma, dátumtípus és évek (a dátummezőkből számolva), ország (pl. gb → xxk), nyelv.'],
-  ['041', 'Fordításnál: $a a tétel nyelve, $h az eredeti nyelv.'],
+  ['041', 'Fordításnál: $a a közlés nyelve, $k a közvetítő nyelv (ha fordításból fordították), $h a keletkezési nyelv.'],
   ['100/110, 700/710', 'Közreműködők: az első szerző 100/110, a többiek 700/710. $e a szerep magyarul, $4 a MARC-relátorkód, $1 a Wikidata-URI, $0 a VIAF/GND/ISNI-URI. A helyi szerepek (pl. futár) csak $e-ben.'],
   ['245', 'Cím ($a), alcím ($b), felelősségi közlés ($c); 2. indikátor: a nem rendező karakterek száma.'],
   ['264, 300', 'Impresszum úgy, ahogy a kiadványon áll (hely, kiadó, dátum); terjedelem.'],
@@ -1876,7 +1879,7 @@ function viewSugo(app) {
     resz('gyors', 'Gyors útmutató: új cikk felvitele',
       h('ol', {},
         h('li', {}, 'A bal oldali listában kattints a számra (pl. „1. évfolyam, 6. szám”), majd a ', b('+ Cikk ebbe'), ' gombra. Vagy: ', b('+ Új tétel'), ' → válaszd, mit veszel fel.'),
-        h('li', {}, 'Töltsd ki a címet, a műfajt, a nyelvet és az oldalt. Ha fordítás, az eredeti nyelvet is.'),
+        h('li', {}, 'Töltsd ki a címet, a műfajt, a nyelvet és az oldalt. Ha fordítás, a keletkezési nyelvet is; ha egy másik fordításból készült, a közvetítő nyelvet is.'),
         h('li', {}, 'Szerző, fordító, szerkesztő: kattints a megfelelő gombra, és kezdd el gépelni a nevet. Ha még nincs az adatbázisban, a lista alján az „+ Új” sorral felveheted.'),
         h('li', {}, 'Kulcsszavak és említett személyek: gépelj, majd ', kbd('Enter'), ' vagy kattintás. Ugyanígy lehet újat felvenni.'),
         h('li', {}, 'Írj 2–3 mondatos tartalmi kivonatot.'),
@@ -1963,11 +1966,11 @@ function viewSugo(app) {
 function csvExport(db, ts) {
   const nevek = (t, f) => db.koz.filter(k => k.tetel_id === t.id && f(k)).sort((a, b) => a.sorrend - b.sorrend).map(k => db.ent.get(k.entitas_id)?.nev).join('; ');
   const targy = (t, tip) => db.targy.filter(x => x.tetel_id === t.id && x.tipus === tip).sort((a, b) => a.sorrend - b.sorrend).map(x => db.ent.get(x.entitas_id)?.nev + (x.emlitesek ? ' x' + x.emlitesek : '')).join('; ');
-  const fej = ['sorszam', 'biblio_szint', 'gazda', 'szam', 'cim', 'alcim', 'rovat', 'kiado', 'kiadas_helye', 'datum', 'datum_edtf', 'datum_kezdet', 'datum_veg', 'oldal', 'terjedelem', 'nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'technika', 'ar', 'szerzo', 'fordito', 'szerkeszto', 'egyeb_kozremukodo', 'kiado_entitas', 'tartalmi_kivonat', 'kulcsszavak', 'emlitett_szemelyek', 'atvetel', 'orzo_jelzet', 'bizonyossag', 'forras_hivatkozas', 'hozzaferes', 'ellenorizve'];
+  const fej = ['sorszam', 'biblio_szint', 'gazda', 'szam', 'cim', 'alcim', 'rovat', 'kiado', 'kiadas_helye', 'datum', 'datum_edtf', 'datum_kezdet', 'datum_veg', 'oldal', 'terjedelem', 'nyelv', 'kozvetito_nyelv', 'eredeti_nyelv', 'mufaj', 'tartalom_tipus', 'technika', 'ar', 'szerzo', 'fordito', 'szerkeszto', 'egyeb_kozremukodo', 'kiado_entitas', 'tartalmi_kivonat', 'kulcsszavak', 'emlitett_szemelyek', 'atvetel', 'orzo_jelzet', 'bizonyossag', 'forras_hivatkozas', 'hozzaferes', 'ellenorizve'];
   const sor = t => {
     const e = k => MARC.eff(db, t, k);
     const sz = t.szulo_id ? db.tetel.get(t.szulo_id) : null; const g = sz?.biblio_szint === 'b' ? db.tetel.get(sz.szulo_id) : sz;
-    return [t.sorszam, t.biblio_szint, g?.cim, sz?.biblio_szint === 'b' ? sz.evfolyam_szam : '', t.cim, t.alcim, t.rovat, e('kiado_atirt'), e('kiadas_helye_atirt'), e('datum_atirt'), e('datum_edtf'), e('datum_kezdet'), e('datum_veg'), t.oldal_pozicio, t.terjedelem_oldal, t.nyelv, t.eredeti_nyelv, t.mufaj, e('tartalom_tipus'), e('sokszorositasi_technika'), e('ar'),
+    return [t.sorszam, t.biblio_szint, g?.cim, sz?.biblio_szint === 'b' ? sz.evfolyam_szam : '', t.cim, t.alcim, t.rovat, e('kiado_atirt'), e('kiadas_helye_atirt'), e('datum_atirt'), e('datum_edtf'), e('datum_kezdet'), e('datum_veg'), t.oldal_pozicio, t.terjedelem_oldal, t.nyelv, t.kozvetito_nyelv, t.eredeti_nyelv, t.mufaj, e('tartalom_tipus'), e('sokszorositasi_technika'), e('ar'),
       nevek(t, k => k.szerep === 'aut'), nevek(t, k => k.szerep === 'trl'), nevek(t, k => k.szerep === 'edt'), db.koz.filter(k => k.tetel_id === t.id && !['aut', 'trl', 'edt', 'pbl'].includes(k.szerep)).map(k => `${k.szerep}: ${db.ent.get(k.entitas_id)?.nev}`).join('; '),
       nevek(t, k => k.szerep === 'pbl'), t.tartalmi_kivonat, targy(t, 'kulcsszo'), targy(t, 'emlitett'),
       db.atv.filter(a => a.tetel_id === t.id).map(a => [a.atvetel_tipus, a.forras_leiras].filter(Boolean).join(': ')).join(' | '),
