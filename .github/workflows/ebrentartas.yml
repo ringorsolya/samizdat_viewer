@@ -15,11 +15,11 @@ jobs:
   ebresztes:
     runs-on: ubuntu-24.04
     steps:
-      - name: Adatbázis-lekérdezés (Data API)
+      - name: Adatbázis-hívás (Data API, ebren_tartas függvény)
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 \
-            "https://wmvvyphchrefuhyuqavd.supabase.co/rest/v1/szd_szotar?select=lista&limit=1" \
-            -H "apikey: sb_publishable_EdxTn9Z0aXoXrexdQ5oz1w_Ms4998kE")
+          code=$(curl -s -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 -X POST \
+            "https://wmvvyphchrefuhyuqavd.supabase.co/rest/v1/rpc/ebren_tartas" \
+            -H "apikey: sb_publishable_EdxTn9Z0aXoXrexdQ5oz1w_Ms4998kE" -H "Content-Type: application/json" -d '{}')
           echo "Válaszkód: $code"
           if [ "$code" != "200" ]; then
             echo "::error::Az ébrentartó hívás nem sikerült (HTTP $code). Ha a projekt már leállt, a Supabase felületén indítsd újra (Restore)."
