@@ -1,0 +1,41 @@
+name: Ébrentartás
+
+# Az ingyenes Supabase-projekt 7 nap inaktivitás után leáll. Ez a munkafolyamat
+# naponta egyszer lekérdezi az adatbázist, hogy ez ne történjen meg.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # minden nap 03:17 UTC (04:17/05:17 budapesti idő)
+  workflow_dispatch:        # kézzel is indítható az Actions fülön
+
+permissions:
+  contents: write
+
+jobs:
+  ebresztes:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Adatbázis-lekérdezés (Data API)
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 20 \
+            "https://wmvvyphchrefuhyuqavd.supabase.co/rest/v1/szd_szotar?select=lista&limit=1" \
+            -H "apikey: sb_publishable_EdxTn9Z0aXoXrexdQ5oz1w_Ms4998kE")
+          echo "Válaszkód: $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Az ébrentartó hívás nem sikerült (HTTP $code). Ha a projekt már leállt, a Supabase felületén indítsd újra (Restore)."
+            exit 1
+          fi
+
+      # A GitHub 60 nap repóaktivitás nélkül kikapcsolja az ütemezett munkafolyamatokat
+      # nyilvános repóban. Havonta egy apró commit ezt megelőzi.
+      - uses: actions/checkout@v5
+      - name: Havi jelzés a repóban (a munkafolyamat életben tartására)
+        run: |
+          if [ "$(date -u +%d)" != "01" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "Nem a hónap első napja, nincs teendő."; exit 0
+          fi
+          date -u +"%Y-%m-%d %H:%M UTC" > .github/utolso_ebresztes.txt
+          git config user.name "samizdat-ebrentartas"
+          git config user.email "samizdat-ebrentartas@users.noreply.github.com"
+          git add .github/utolso_ebresztes.txt
+          git diff --cached --quiet || { git commit -m "Havi ébrentartás $(date -u +%Y-%m)"; git push; }
